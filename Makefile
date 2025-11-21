@@ -67,7 +67,8 @@ ISO_IMAGE = $(BUILD_DIR)/auroraos.iso
 
 # Object files
 BOOT_OBJS = $(BUILD_DIR)/boot.o
-KERNEL_OBJS = $(BUILD_DIR)/entry.o \
+KERNEL_OBJS = $(BUILD_DIR)/multiboot.o \
+              $(BUILD_DIR)/entry.o \
               $(BUILD_DIR)/main.o \
               $(BUILD_DIR)/console.o
 
@@ -106,6 +107,10 @@ $(KERNEL_ELF): $(KERNEL_OBJS) $(KERNEL_DIR)/linker.ld
 	@echo "[LD] Linking kernel..."
 	$(LD) $(KERNEL_LD_FLAGS) -o $@ $(KERNEL_OBJS)
 
+$(BUILD_DIR)/multiboot.o: $(KERNEL_DIR)/multiboot.S | $(BUILD_DIR)
+	@echo "[AS] Assembling multiboot header..."
+	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
+
 $(BUILD_DIR)/entry.o: $(KERNEL_DIR)/entry.S | $(BUILD_DIR)
 	@echo "[AS] Assembling kernel entry..."
 	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
@@ -129,6 +134,7 @@ $(KERNEL_DIR)/linker.ld:
 	@echo "    . = 0x100000;" >> $@
 	@echo "" >> $@
 	@echo "    .text : {" >> $@
+	@echo "        *(.multiboot)" >> $@
 	@echo "        *(.text)" >> $@
 	@echo "    }" >> $@
 	@echo "" >> $@

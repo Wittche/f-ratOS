@@ -277,6 +277,130 @@ This fix was part of making kernel robust for testing without a bootloader:
 
 ---
 
+### [2025-11-21] QEMU PVH ELF Note Error - Missing Multiboot Header (AuroraOS)
+**Phase**: Phase 1 - QEMU testing and boot protocol
+**Component**: Kernel ELF file - Missing Multiboot/PVH boot protocol header
+**Description**: After successfully building the kernel with NULL safety, attempting to boot it in QEMU using `-kernel` flag resulted in PVH ELF Note error.
+
+**Error**:
+```
+qemu-system-x86_64: Error loading uncompressed kernel without PVH ELF Note
+make: *** [Makefile:175: run-bios] Error 1
+```
+
+**Root Cause**:
+QEMU's `-kernel` flag can boot kernels using multiple protocols:
+1. **Multiboot** - Legacy boot protocol (used by GRUB)
+2. **PVH** - Modern paravirtualized boot protocol (Linux)
+3. **ELF with boot notes** - Various ELF note sections
+
+Our kernel.elf had NONE of these! We had created a `kernel/multiboot.S` file with the Multiboot header, but:
+1. It was never added to the build system
+2. Even after adding it, the linker placed it at the WRONG location (end of file instead of beginning)
+
+**Investigation Process**:
+1. **First attempt**: Added multiboot.o to KERNEL_OBJS in Makefile ✅
+2. **First attempt**: Added build rule for multiboot.o ✅
+3. **First attempt**: Created separate .multiboot section in linker script ❌
+
+   Result: Multiboot header was placed at offset 0xcb4 (end of file), OUTSIDE the LOAD segment!
+
+   ```bash
+   $ readelf -S build/kernel.elf
+   [ 1] .multiboot   PROGBITS   0000000000100000  00000cb4  # Wrong offset!
+   [ 2] .text        PROGBITS   0000000000100000  000000c0  # Actual code start
+
+   $ od -Ax -tx4z -j 0xcb4 -N 12 build/kernel.elf
+   000cb4 1badb002 00000003 e4524ffb  # Multiboot header found BUT at wrong location!
+   ```
+
+4. **Problem identified**: The .multiboot section was at the same Virtual Address (0x100000) as .text, but at a different file offset. The LOAD segment started at 0xc0 (.text), so .multiboot at 0xcb4 was not loaded into memory!
+
+5. **Solution**: Place .multiboot INSIDE the .text section, BEFORE the actual code:
+   ```ld
+   .text : {
+       *(.multiboot)   # Multiboot header FIRST
+       *(.text)        # Then actual code
+   }
+   ```
+
+**Solution Applied**:
+Modified Makefile linker script generation to include .multiboot inside .text section:
+
+```makefile
+# Before (WRONG - separate section):
+.multiboot : {
+    *(.multiboot)
+}
+
+.text : {
+    *(.text)
+}
+
+# After (CORRECT - inside .text):
+.text : {
+    *(.multiboot)   # Header first
+    *(.text)        # Code follows
+}
+```
+
+**Verification**:
+```bash
+$ od -Ax -tx4z -j 0xc0 -N 12 build/kernel.elf
+0000c0 1badb002 00000003 e4524ffb  # Multiboot magic at LOAD segment start! ✅
+
+Multiboot header breakdown:
+- 0x1badb002 = Multiboot magic number
+- 0x00000003 = Flags (ALIGN | MEMINFO)
+- 0xe4524ffb = Checksum (-(magic + flags))
+```
+
+**Result**: ✅ Kernel ELF now has proper Multiboot header at the beginning of the LOAD segment, making it bootable by QEMU and GRUB
+
+**Debugging Tools Used**:
+```bash
+# Check ELF sections and their offsets
+readelf -S build/kernel.elf
+
+# Check program headers (LOAD segments)
+readelf -l build/kernel.elf
+
+# Verify multiboot magic bytes at specific offset
+od -Ax -tx4z -j <offset> -N 12 build/kernel.elf
+
+# Check section to segment mapping
+readelf -l build/kernel.elf | grep "Section to Segment"
+```
+
+**Commit**: (pending)
+
+**Prevention**:
+- **Multiboot header must be in first LOAD segment** - QEMU/GRUB read it from there
+- **Use linker script carefully** - separate sections can end up at wrong file offsets
+- **Verify with readelf -l** - check that multiboot section is in first LOAD segment
+- **Check file offsets vs virtual addresses** - they can differ!
+- **Test incrementally** - verify multiboot header location before testing boot
+
+**Key Lesson**: When creating bootable kernel ELF files:
+1. Multiboot header must be within first 8KB of kernel image
+2. It must be part of a LOAD segment (not orphaned)
+3. File offset matters as much as virtual address
+4. Placing it inside .text section ensures it's loaded properly
+5. Always verify with `readelf -l` and `od` before testing
+
+**Related Files Modified**:
+- `Makefile`: Added multiboot.o to KERNEL_OBJS (as FIRST object)
+- `Makefile`: Added build rule for multiboot.o
+- `Makefile`: Modified linker script to place .multiboot inside .text section
+- `kernel/multiboot.S`: Already existed but wasn't integrated
+
+**Boot Protocol References**:
+- Multiboot Specification: https://www.gnu.org/software/grub/manual/multiboot/multiboot.html
+- PVH Boot Protocol: https://xenbits.xen.org/docs/unstable/misc/pvh.html
+- QEMU Direct Kernel Boot: https://qemu.readthedocs.io/en/latest/system/linuxboot.html
+
+---
+
 ## Tips and Lessons Learned
 
 ### General
