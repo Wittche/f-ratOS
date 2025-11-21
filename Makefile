@@ -73,6 +73,7 @@ KERNEL_OBJS = $(BUILD_DIR)/multiboot.o \
               $(BUILD_DIR)/console.o \
               $(BUILD_DIR)/gdt.o \
               $(BUILD_DIR)/gdt_asm.o \
+              $(BUILD_DIR)/tss.o \
               $(BUILD_DIR)/idt.o \
               $(BUILD_DIR)/idt_asm.o \
               $(BUILD_DIR)/pmm.o \
@@ -86,7 +87,9 @@ KERNEL_OBJS = $(BUILD_DIR)/multiboot.o \
               $(BUILD_DIR)/switch.o \
               $(BUILD_DIR)/syscall.o \
               $(BUILD_DIR)/syscall_asm.o \
-              $(BUILD_DIR)/kthread_test.o
+              $(BUILD_DIR)/kthread_test.o \
+              $(BUILD_DIR)/usermode.o \
+              $(BUILD_DIR)/usermode_test.o
 
 # Default target
 .PHONY: all
@@ -147,6 +150,10 @@ $(BUILD_DIR)/gdt_asm.o: $(KERNEL_DIR)/gdt_asm.S | $(BUILD_DIR)
 	@echo "[AS] Assembling GDT loader..."
 	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
 
+$(BUILD_DIR)/tss.o: $(KERNEL_DIR)/tss.c $(KERNEL_DIR)/tss.h $(KERNEL_DIR)/gdt.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/types.h | $(BUILD_DIR)
+	@echo "[CC] Compiling TSS..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
 $(BUILD_DIR)/idt.o: $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/idt.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/io.h $(KERNEL_DIR)/timer.h $(KERNEL_DIR)/keyboard.h | $(BUILD_DIR)
 	@echo "[CC] Compiling IDT..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
@@ -201,6 +208,14 @@ $(BUILD_DIR)/syscall_asm.o: $(KERNEL_DIR)/syscall_asm.S | $(BUILD_DIR)
 
 $(BUILD_DIR)/kthread_test.o: $(KERNEL_DIR)/kthread_test.c $(KERNEL_DIR)/kthread_test.h $(KERNEL_DIR)/process.h $(KERNEL_DIR)/scheduler.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/timer.h $(KERNEL_DIR)/types.h | $(BUILD_DIR)
 	@echo "[CC] Compiling kernel thread tests..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/usermode.o: $(KERNEL_DIR)/usermode.c $(KERNEL_DIR)/usermode.h $(KERNEL_DIR)/tss.h $(KERNEL_DIR)/gdt.h $(KERNEL_DIR)/kheap.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/types.h | $(BUILD_DIR)
+	@echo "[CC] Compiling user mode support..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/usermode_test.o: $(KERNEL_DIR)/usermode_test.c $(KERNEL_DIR)/syscall.h $(KERNEL_DIR)/types.h | $(BUILD_DIR)
+	@echo "[CC] Compiling user mode test program..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
 # Create kernel linker script

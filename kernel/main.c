@@ -19,6 +19,11 @@
 #include "scheduler.h"
 #include "syscall.h"
 #include "kthread_test.h"
+#include "tss.h"
+#include "usermode.h"
+
+// User mode test program (defined in usermode_test.c)
+extern void usermode_test_program(void);
 
 // Forward declarations
 static void print_memory_map(boot_info_t *info);
@@ -93,9 +98,13 @@ void kernel_main(boot_info_t *boot_info) {
     // Initialize kernel subsystems
     console_print("\n[KERNEL] Initializing subsystems...\n");
 
-    // Initialize GDT (must be done before IDT)
+    // Initialize GDT (must be done before IDT and TSS)
     gdt_init();
     console_print("  [OK] GDT (Global Descriptor Table)\n");
+
+    // Initialize TSS (must be done after GDT)
+    tss_init();
+    console_print("  [OK] TSS (Task State Segment)\n");
 
     // Initialize IDT
     idt_init();
@@ -135,22 +144,19 @@ void kernel_main(boot_info_t *boot_info) {
 
     console_print("\n[KERNEL] All subsystems initialized!\n\n");
 
-    // Initialize test kernel threads
-    kthread_test_init();
-
     // TODO: Initialize Mach layer
-    console_print("\n  [ ] Mach Microkernel Layer (TODO)\n");
+    console_print("  [ ] Mach Microkernel Layer (TODO)\n");
 
     // TODO: Initialize BSD layer
     console_print("  [ ] BSD Layer (TODO)\n\n");
 
     console_print("=====================================\n");
     console_print("  AuroraOS Kernel Ready!\n");
-    console_print("=====================================\n");
+    console_print("=====================================\n\n");
 
-    // Start kernel threads and scheduler
-    // This function will not return - scheduler takes over
-    kthread_test_start();
+    // Start user mode test program
+    // This function will not return - jumps to Ring 3
+    start_usermode_process(usermode_test_program);
 
     // Should never reach here
     console_print("\n[ERROR] Returned from kthread_test_start()!\n");

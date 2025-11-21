@@ -8,7 +8,7 @@
 #include "console.h"
 
 // GDT entries and pointer
-static gdt_entry_t gdt[GDT_ENTRIES];
+gdt_entry_t gdt[GDT_ENTRIES];  // Exported for TSS
 static gdt_ptr_t gdt_ptr;
 
 /**
