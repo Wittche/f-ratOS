@@ -1,0 +1,29 @@
+# Build artifacts
+build/
+*.o
+*.elf
+*.bin
+*.iso
+*.img
+*.efi
+*.EFI
+
+# Linker script (auto-generated)
+kernel/linker.ld
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Dependencies
+*.d
