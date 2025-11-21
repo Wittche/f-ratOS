@@ -167,12 +167,13 @@ run: $(BOOTLOADER_EFI) $(KERNEL_BIN)
 		-m 256M \
 		-serial stdio
 
-# Run with QEMU (legacy BIOS - for testing basic kernel)
+# Run with QEMU (use ELF format - simpler for testing)
 .PHONY: run-bios
-run-bios: $(KERNEL_BIN)
-	@echo "Running kernel in QEMU (legacy BIOS mode for testing)..."
+run-bios: $(KERNEL_ELF)
+	@echo "Running kernel in QEMU (direct ELF load for testing)..."
+	@echo "Note: This is a basic test - kernel expects boot_info but gets multiboot info"
 	qemu-system-x86_64 \
-		-kernel $(KERNEL_BIN) \
+		-kernel $(KERNEL_ELF) \
 		-m 256M \
 		-serial stdio
 
