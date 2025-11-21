@@ -7,6 +7,7 @@
 #include "idt.h"
 #include "console.h"
 #include "io.h"
+#include "timer.h"
 
 // IDT entries and pointer
 static idt_entry_t idt[IDT_ENTRIES];
@@ -239,7 +240,8 @@ void irq_handler(interrupt_frame_t *frame) {
     // Handle specific IRQs
     switch (frame->int_no) {
         case IRQ_TIMER:
-            // Timer tick - handled silently for now
+            // Timer tick - call timer handler
+            timer_irq_handler();
             break;
 
         case IRQ_KEYBOARD:
