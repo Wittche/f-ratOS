@@ -10,6 +10,7 @@
 #include "console.h"
 #include "gdt.h"
 #include "idt.h"
+#include "pmm.h"
 
 // Forward declarations
 static void print_memory_map(boot_info_t *info);
@@ -92,8 +93,9 @@ void kernel_main(boot_info_t *boot_info) {
     idt_init();
     console_print("  [OK] IDT (Interrupt Descriptor Table)\n");
 
-    // TODO: Initialize physical memory manager
-    console_print("  [ ] PMM (Physical Memory Manager)\n");
+    // Initialize Physical Memory Manager
+    pmm_init(boot_info);
+    console_print("  [OK] PMM (Physical Memory Manager)\n");
 
     // TODO: Initialize virtual memory/paging
     console_print("  [ ] VMM (Virtual Memory Manager)\n");

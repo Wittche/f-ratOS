@@ -74,7 +74,8 @@ KERNEL_OBJS = $(BUILD_DIR)/multiboot.o \
               $(BUILD_DIR)/gdt.o \
               $(BUILD_DIR)/gdt_asm.o \
               $(BUILD_DIR)/idt.o \
-              $(BUILD_DIR)/idt_asm.o
+              $(BUILD_DIR)/idt_asm.o \
+              $(BUILD_DIR)/pmm.o
 
 # Default target
 .PHONY: all
@@ -142,6 +143,10 @@ $(BUILD_DIR)/idt.o: $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/idt.h $(KERNEL_DIR)/types.
 $(BUILD_DIR)/idt_asm.o: $(KERNEL_DIR)/idt_asm.S | $(BUILD_DIR)
 	@echo "[AS] Assembling IDT stubs..."
 	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
+
+$(BUILD_DIR)/pmm.o: $(KERNEL_DIR)/pmm.c $(KERNEL_DIR)/pmm.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/boot.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
+	@echo "[CC] Compiling PMM..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
 # Create kernel linker script
 $(KERNEL_DIR)/linker.ld:
