@@ -372,7 +372,7 @@ od -Ax -tx4z -j <offset> -N 12 build/kernel.elf
 readelf -l build/kernel.elf | grep "Section to Segment"
 ```
 
-**Commit**: (pending)
+**Commit**: 3b0e898
 
 **Prevention**:
 - **Multiboot header must be in first LOAD segment** - QEMU/GRUB read it from there
@@ -398,6 +398,148 @@ readelf -l build/kernel.elf | grep "Section to Segment"
 - Multiboot Specification: https://www.gnu.org/software/grub/manual/multiboot/multiboot.html
 - PVH Boot Protocol: https://xenbits.xen.org/docs/unstable/misc/pvh.html
 - QEMU Direct Kernel Boot: https://qemu.readthedocs.io/en/latest/system/linuxboot.html
+
+---
+
+### [2025-11-21] QEMU Multiboot 1 Limitation - 64-bit Kernel Not Supported (AuroraOS)
+**Phase**: Phase 1 - QEMU testing with Multiboot
+**Component**: Boot protocol - Multiboot 1 vs 64-bit kernel incompatibility
+**Description**: After successfully adding Multiboot header and verifying its correct placement, QEMU still refused to boot the kernel with a 32-bit vs 64-bit error.
+
+**Error**:
+```
+qemu-system-x86_64: Cannot load x86-64 image, give a 32bit one.
+make: *** [Makefile:181: run-bios] Error 1
+```
+
+**Root Cause**:
+This is a **fundamental limitation** of the Multiboot 1 protocol:
+
+1. **Multiboot 1 Specification**: Always starts kernel in **32-bit protected mode**
+2. **Our Kernel**: Written for **64-bit long mode** (x86_64 architecture)
+3. **QEMU's -kernel flag**: When using Multiboot 1, expects 32-bit ELF or requires a 32-bit entry point
+
+**Why This Happens**:
+```
+Multiboot 1 boot flow:
+GRUB/QEMU → 32-bit protected mode → Kernel entry point
+              ^^^^^^^^^^^^^^^^^^^
+              Our kernel expects 64-bit long mode here!
+
+Our kernel entry.S:
+.code64              # ← Declared as 64-bit code
+_start:
+    cli              # This is 64-bit instruction
+    lea stack_top(%rip), %rsp  # 64-bit addressing
+```
+
+The Multiboot 1 header is correct and properly positioned, but the protocol itself cannot directly boot a 64-bit kernel on QEMU.
+
+**Solutions & Workarounds**:
+
+**Option 1: Add 32-bit Bootstrap (Complex)**
+Create a 32-bit entry point that:
+1. Receives control in 32-bit protected mode
+2. Sets up long mode (64-bit)
+   - Enable PAE (Physical Address Extension)
+   - Set up basic page tables
+   - Enable long mode in EFER MSR
+   - Jump to 64-bit code
+3. Call the 64-bit kernel_main
+
+**Pros**: Works with Multiboot 1 and QEMU -kernel
+**Cons**: Adds significant complexity, duplicates work done by UEFI bootloader
+
+**Option 2: Upgrade to Multiboot 2 (Modern)**
+Multiboot 2 specification supports:
+- Native 64-bit entry points
+- UEFI boot services
+- Better information passing
+
+**Pros**: Clean, modern, proper 64-bit support
+**Cons**: Requires rewriting multiboot.S, less universal than Multiboot 1
+
+**Option 3: Use UEFI Bootloader (Recommended)**
+Test kernel with the actual UEFI bootloader we're building:
+```
+bootloader/efi/boot.c → Sets up long mode → kernel_main()
+```
+
+**Pros**:
+- This is our actual deployment path
+- UEFI handles all long mode setup
+- Tests the real boot flow
+- No workarounds needed
+
+**Cons**: Requires complete bootloader implementation
+
+**Option 4: Real Hardware / Full VM (Future)**
+Boot from actual UEFI firmware (OVMF) or real hardware
+
+**Current Status**:
+✅ Kernel builds successfully
+✅ Multiboot header correctly positioned
+✅ Kernel code is valid 64-bit x86_64
+❌ Cannot test with QEMU -kernel due to Multiboot 1 limitation
+➡️ **Will test with UEFI bootloader instead**
+
+**Decision**:
+For AuroraOS, we will:
+1. **Keep Multiboot 1 header** for GRUB compatibility (GRUB can handle the transition)
+2. **Focus on UEFI bootloader** as primary boot method
+3. **Document this limitation** for developers
+4. **Consider Multiboot 2** as future enhancement if needed
+
+**Verification That Kernel Is Correct**:
+```bash
+# Kernel is proper 64-bit ELF
+$ file build/kernel.elf
+build/kernel.elf: ELF 64-bit LSB executable, x86-64
+
+# Entry point is correct
+$ readelf -h build/kernel.elf | grep Entry
+Entry point address: 0x100000
+
+# Code is 64-bit
+$ objdump -d build/kernel.elf | head -20
+100000: fa                    cli
+100001: 48 8d 25 f8 4b 00 00  lea    0x4bf8(%rip),%rsp  # 64-bit!
+```
+
+**Commit**: (pending - documentation update)
+
+**Prevention & Best Practices**:
+- **Understand boot protocol limitations** - Multiboot 1 is 32-bit only
+- **Choose boot protocol based on architecture** - Multiboot 2 for native 64-bit
+- **UEFI is the modern standard** for 64-bit OS development
+- **Test early** to discover incompatibilities before extensive development
+- **Document architecture decisions** to avoid confusion later
+
+**Key Lesson**:
+Boot protocols and CPU modes must match:
+- **Multiboot 1** → 32-bit protected mode → (need manual long mode setup) → 64-bit kernel
+- **Multiboot 2** → Can start directly in 64-bit long mode → 64-bit kernel
+- **UEFI** → Already in long mode when ExitBootServices called → 64-bit kernel ✅
+
+**Why UEFI Is Better For Our Use Case**:
+1. ✅ Native 64-bit support (already in long mode)
+2. ✅ Graphics Output Protocol (GOP) for GUI
+3. ✅ Memory map services
+4. ✅ File system access (can load kernel from FAT32)
+5. ✅ Modern standard (post-2010 systems)
+6. ✅ Matches our XNU/macOS inspiration (macOS uses EFI)
+
+**References**:
+- Multiboot 1 Spec (32-bit): https://www.gnu.org/software/grub/manual/multiboot/multiboot.html
+- Multiboot 2 Spec (64-bit): https://www.gnu.org/software/grub/manual/multiboot2/multiboot.html
+- Intel Long Mode Setup: Intel® 64 and IA-32 Architectures Software Developer's Manual, Volume 3
+- OSDev Wiki - Entering Long Mode: https://wiki.osdev.org/Setting_Up_Long_Mode
+
+**Next Steps**:
+1. Continue with UEFI bootloader implementation
+2. Test kernel with UEFI boot flow
+3. Verify kernel works correctly when loaded by bootloader
+4. Consider Multiboot 2 as future enhancement if GRUB compatibility needed
 
 ---
 
