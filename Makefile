@@ -102,9 +102,9 @@ $(KERNEL_BIN): $(KERNEL_ELF)
 	@echo "[OBJCOPY] Creating kernel binary..."
 	$(OBJCOPY) -O binary $< $@
 
-$(KERNEL_ELF): $(KERNEL_OBJS)
+$(KERNEL_ELF): $(KERNEL_OBJS) $(KERNEL_DIR)/linker.ld
 	@echo "[LD] Linking kernel..."
-	$(LD) $(KERNEL_LD_FLAGS) -o $@ $^
+	$(LD) $(KERNEL_LD_FLAGS) -o $@ $(KERNEL_OBJS)
 
 $(BUILD_DIR)/entry.o: $(KERNEL_DIR)/entry.S | $(BUILD_DIR)
 	@echo "[AS] Assembling kernel entry..."
