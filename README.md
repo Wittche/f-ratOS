@@ -39,10 +39,10 @@ AuroraOS/
 - [x] Exception and IRQ handlers
 - [x] Build system (Makefile)
 
-**Phase 2: Memory Management** (Next)
-- [ ] Physical Memory Manager (PMM)
-- [ ] Virtual Memory Manager (VMM)
-- [ ] Kernel heap allocator
+**Phase 2: Memory Management** ✅ (Complete)
+- [x] Physical Memory Manager (PMM)
+- [x] Virtual Memory Manager (VMM)
+- [x] Kernel heap allocator
 
 ## Build Requirements
 
@@ -72,7 +72,7 @@ make test
 
 This will:
 1. Build bootloader (BOOTX64.EFI - 5KB)
-2. Build kernel (kernel.bin - 9.4KB)
+2. Build kernel (kernel.bin - 19KB)
 3. Launch QEMU for testing
 4. Show kernel output in VGA console
 
@@ -87,7 +87,7 @@ make all
 
 This builds:
 - `build/BOOTX64.EFI` - UEFI bootloader (5KB)
-- `build/kernel.bin` - Kernel binary (9.4KB)
+- `build/kernel.bin` - Kernel binary (19KB)
 - `build/kernel.elf` - Kernel with debug symbols
 
 ### Build Kernel Only
@@ -150,8 +150,20 @@ Expected output:
 [IDT] Exceptions: 0-31, IRQs: 32-47
   [OK] IDT (Interrupt Descriptor Table)
 
-  [ ] PMM (Physical Memory Manager)
-  [ ] VMM (Virtual Memory Manager)
+[PMM] Initializing Physical Memory Manager...
+[PMM] Bitmap allocator initialized
+  [OK] PMM (Physical Memory Manager)
+
+[VMM] Initializing Virtual Memory Manager...
+[VMM] PML4 allocated, identity mapping first 4MB
+  [OK] VMM (Virtual Memory Manager)
+
+[HEAP] Initializing kernel heap...
+[HEAP] Initialized at 0x200000 (1MB initial)
+  [OK] Kernel Heap
+
+  [ ] Mach Microkernel Layer
+  [ ] BSD Layer
   ...
 
 [HALT] System halted
