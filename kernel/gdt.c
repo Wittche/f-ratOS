@@ -77,20 +77,29 @@ void gdt_init(void) {
                  GDT_KERNEL_DATA_ACCESS,
                  GDT_GRAN_GRANULARITY | GDT_GRAN_32BIT);
 
-    // Entry 3: User Code Segment (64-bit) - for future use
-    // Will be used when we implement user-space
-    gdt_set_gate(GDT_USER_CODE,
+    // Entry 3: User Code Segment (32-bit compatibility mode)
+    // For 32-bit processes in compatibility mode
+    gdt_set_gate(GDT_USER_CODE32,
                  0,
                  0xFFFFF,
                  GDT_USER_CODE_ACCESS,
-                 GDT_GRAN_GRANULARITY | GDT_GRAN_64BIT);
+                 GDT_GRAN_GRANULARITY | GDT_GRAN_32BIT);
 
-    // Entry 4: User Data Segment (64-bit) - for future use
+    // Entry 4: User Data Segment
+    // Used by both 32-bit and 64-bit user processes
     gdt_set_gate(GDT_USER_DATA,
                  0,
                  0xFFFFF,
                  GDT_USER_DATA_ACCESS,
                  GDT_GRAN_GRANULARITY | GDT_GRAN_32BIT);
+
+    // Entry 5: User Code Segment (64-bit long mode)
+    // Used by SYSRET for 64-bit processes
+    gdt_set_gate(GDT_USER_CODE64,
+                 0,
+                 0xFFFFF,
+                 GDT_USER_CODE_ACCESS,
+                 GDT_GRAN_GRANULARITY | GDT_GRAN_64BIT);
 
     // Load GDT and update segment registers
     gdt_load();

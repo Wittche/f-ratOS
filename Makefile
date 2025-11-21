@@ -83,7 +83,9 @@ KERNEL_OBJS = $(BUILD_DIR)/multiboot.o \
               $(BUILD_DIR)/keyboard.o \
               $(BUILD_DIR)/process.o \
               $(BUILD_DIR)/scheduler.o \
-              $(BUILD_DIR)/switch.o
+              $(BUILD_DIR)/switch.o \
+              $(BUILD_DIR)/syscall.o \
+              $(BUILD_DIR)/syscall_asm.o
 
 # Default target
 .PHONY: all
@@ -186,6 +188,14 @@ $(BUILD_DIR)/scheduler.o: $(KERNEL_DIR)/scheduler.c $(KERNEL_DIR)/scheduler.h $(
 
 $(BUILD_DIR)/switch.o: $(KERNEL_DIR)/switch.S | $(BUILD_DIR)
 	@echo "[AS] Assembling context switch..."
+	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
+
+$(BUILD_DIR)/syscall.o: $(KERNEL_DIR)/syscall.c $(KERNEL_DIR)/syscall.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/process.h $(KERNEL_DIR)/scheduler.h $(KERNEL_DIR)/timer.h $(KERNEL_DIR)/types.h | $(BUILD_DIR)
+	@echo "[CC] Compiling system call interface..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/syscall_asm.o: $(KERNEL_DIR)/syscall_asm.S | $(BUILD_DIR)
+	@echo "[AS] Assembling system call entry..."
 	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
 
 # Create kernel linker script

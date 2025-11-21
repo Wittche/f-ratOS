@@ -17,6 +17,7 @@
 #include "keyboard.h"
 #include "process.h"
 #include "scheduler.h"
+#include "syscall.h"
 
 // Forward declarations
 static void print_memory_map(boot_info_t *info);
@@ -126,6 +127,10 @@ void kernel_main(boot_info_t *boot_info) {
     // Initialize Scheduler
     scheduler_init();
     console_print("  [OK] Scheduler\n");
+
+    // Initialize System Call Interface
+    syscall_init();
+    console_print("  [OK] System Call Interface\n");
 
     // TODO: Initialize Mach layer
     console_print("  [ ] Mach Microkernel Layer\n");
