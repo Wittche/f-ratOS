@@ -117,6 +117,77 @@ Specify `AT(ADDR(.section) - 0x10000)` for ALL sections to ensure:
 
 ---
 
+### [2025-11-21] Build Errors: GCC Target Flag and NASM Missing (AuroraOS)
+**Phase**: Phase 1 - Build system setup
+**Component**: Makefile, toolchain configuration
+**Description**: Multiple build errors when attempting to compile AuroraOS for the first time on a system without NASM.
+
+**Error Sequence**:
+1. ❌ `gcc: error: unrecognized command-line option '-target'`
+2. ❌ `make: nasm: No such file or directory`
+3. ❌ `cc1: error: code model kernel does not support PIC mode`
+4. ❌ `error: 'validate_boot_info' declared 'static' but never defined`
+5. ❌ `error: unused parameter 'pitch'`
+
+**Root Cause**:
+Multiple issues in initial build system:
+1. **Wrong compiler for bootloader**: Used `CC = gcc` for UEFI bootloader, but `-target` flag is Clang-specific
+2. **NASM dependency**: entry.asm required NASM assembler which wasn't installed
+3. **PIC mode conflict**: GCC defaulting to PIC mode which conflicts with `-mcmodel=kernel`
+4. **Code quality**: Unused forward declarations and parameters with `-Werror`
+
+**Solution**:
+1. **Separate toolchains**:
+```makefile
+BOOT_CC = clang     # For UEFI bootloader (-target support)
+KERNEL_CC = gcc     # For kernel
+AS = as             # GNU Assembler (comes with GCC)
+```
+
+2. **Convert assembly to GNU syntax**:
+   - Created `kernel/entry.S` (GNU AS syntax) from `entry.asm` (NASM syntax)
+   - Changed flags: `-f elf64` → `--64`
+   - Key syntax changes:
+     - `section .text` → `.section .text`
+     - `global _start` → `.global _start`
+     - `[rel symbol]` → `symbol(%rip)`
+
+3. **Fix PIC mode**:
+```makefile
+KERNEL_CC_FLAGS = ... \
+    -fno-pic \          # Disable position-independent code
+    -fno-pie \          # Disable position-independent executable
+    -mcmodel=kernel \   # Kernel code model
+```
+
+4. **Code cleanup**:
+   - Removed unused `validate_boot_info()` declaration
+   - Added `(void)pitch;` to suppress warning
+
+**Debugging Process**:
+1. Identified `-target` is Clang-only → Split compilers
+2. NASM missing → Convert to GNU Assembler (universally available)
+3. PIC error → Added -fno-pic/-fno-pie flags
+4. Warnings → Fixed code quality issues
+
+**Commit**: `370fde8`
+**Result**: ✅ Kernel builds successfully (3KB binary)
+
+**Prevention**:
+- **Document dependencies** clearly (or avoid them like NASM)
+- **Use widely available tools** (GNU as instead of NASM)
+- **Separate toolchains** for different components (bootloader vs kernel)
+- **Test builds** on fresh systems without assuming installed tools
+- **Disable PIC/PIE** explicitly for bare-metal kernel code
+
+**Key Lessons**:
+- Clang vs GCC flags are different - document which compiler for which component
+- GNU Assembler is more portable than NASM
+- `-mcmodel=kernel` requires `-fno-pic -fno-pie`
+- Keep build dependencies minimal for portability
+
+---
+
 ## Tips and Lessons Learned
 
 ### General
