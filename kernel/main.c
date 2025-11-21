@@ -8,6 +8,7 @@
 #include "types.h"
 #include "boot.h"
 #include "console.h"
+#include "gdt.h"
 #include "idt.h"
 
 // Forward declarations
@@ -83,8 +84,9 @@ void kernel_main(boot_info_t *boot_info) {
     // Initialize kernel subsystems
     console_print("\n[KERNEL] Initializing subsystems...\n");
 
-    // TODO: Initialize GDT
-    console_print("  [ ] GDT (Global Descriptor Table)\n");
+    // Initialize GDT (must be done before IDT)
+    gdt_init();
+    console_print("  [OK] GDT (Global Descriptor Table)\n");
 
     // Initialize IDT
     idt_init();
