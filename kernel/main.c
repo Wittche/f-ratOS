@@ -10,7 +10,6 @@
 #include "console.h"
 
 // Forward declarations
-static void validate_boot_info(boot_info_t *info);
 static void print_memory_map(boot_info_t *info);
 
 /**

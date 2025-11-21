@@ -2,8 +2,9 @@
 # Build system for bootloader and kernel
 
 # Toolchain
-CC = gcc
-AS = nasm
+BOOT_CC = clang          # Use Clang for UEFI bootloader (supports -target)
+KERNEL_CC = gcc          # Use GCC for kernel
+AS = as                  # Use GNU Assembler (comes with GCC)
 LD = ld
 OBJCOPY = objcopy
 
@@ -40,6 +41,8 @@ KERNEL_CC_FLAGS = -ffreestanding \
                   -nostdinc \
                   -fno-builtin \
                   -fno-stack-protector \
+                  -fno-pic \
+                  -fno-pie \
                   -mno-red-zone \
                   -mcmodel=kernel \
                   -m64 \
@@ -48,8 +51,8 @@ KERNEL_CC_FLAGS = -ffreestanding \
                   -Wall -Wextra -Werror \
                   -O2
 
-# Assembler flags for kernel
-KERNEL_AS_FLAGS = -f elf64
+# Assembler flags for kernel (GNU as)
+KERNEL_AS_FLAGS = --64
 
 # Linker flags for kernel
 KERNEL_LD_FLAGS = -n \
@@ -75,6 +78,12 @@ all: $(BOOTLOADER_EFI) $(KERNEL_BIN)
 	@echo "Bootloader: $(BOOTLOADER_EFI)"
 	@echo "Kernel:     $(KERNEL_BIN)"
 
+# Build only kernel (skip bootloader)
+.PHONY: kernel
+kernel: $(KERNEL_BIN)
+	@echo "Kernel build complete!"
+	@echo "Kernel: $(KERNEL_BIN)"
+
 # Create build directory
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -82,11 +91,11 @@ $(BUILD_DIR):
 # Build UEFI bootloader
 $(BOOTLOADER_EFI): $(BOOT_OBJS) | $(BUILD_DIR)
 	@echo "[LD] Linking UEFI bootloader..."
-	$(CC) $(EFI_LD_FLAGS) -o $@ $^
+	$(BOOT_CC) $(EFI_LD_FLAGS) -o $@ $^
 
 $(BUILD_DIR)/boot.o: $(BOOT_DIR)/boot.c $(BOOT_DIR)/efi.h | $(BUILD_DIR)
 	@echo "[CC] Compiling bootloader..."
-	$(CC) $(EFI_CC_FLAGS) -c $< -o $@
+	$(BOOT_CC) $(EFI_CC_FLAGS) -c $< -o $@
 
 # Build kernel
 $(KERNEL_BIN): $(KERNEL_ELF)
@@ -97,17 +106,17 @@ $(KERNEL_ELF): $(KERNEL_OBJS)
 	@echo "[LD] Linking kernel..."
 	$(LD) $(KERNEL_LD_FLAGS) -o $@ $^
 
-$(BUILD_DIR)/entry.o: $(KERNEL_DIR)/entry.asm | $(BUILD_DIR)
+$(BUILD_DIR)/entry.o: $(KERNEL_DIR)/entry.S | $(BUILD_DIR)
 	@echo "[AS] Assembling kernel entry..."
 	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
 
 $(BUILD_DIR)/main.o: $(KERNEL_DIR)/main.c $(KERNEL_DIR)/types.h $(KERNEL_DIR)/boot.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
 	@echo "[CC] Compiling kernel main..."
-	$(CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
 $(BUILD_DIR)/console.o: $(KERNEL_DIR)/console.c $(KERNEL_DIR)/console.h $(KERNEL_DIR)/types.h | $(BUILD_DIR)
 	@echo "[CC] Compiling console..."
-	$(CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
 # Create kernel linker script
 $(KERNEL_DIR)/linker.ld:

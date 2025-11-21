@@ -54,6 +54,8 @@ static inline uint16_t vga_entry(unsigned char uc, uint8_t color) {
 
 // Initialize console
 void console_init(void *framebuffer, uint32_t width, uint32_t height, uint32_t pitch) {
+    (void)pitch;  // Unused for now, suppress warning
+
     if (framebuffer && width > 0 && height > 0) {
         // Framebuffer mode (not implemented yet)
         console.buffer = (uint16_t*)framebuffer;
