@@ -12,6 +12,7 @@
 #include "idt.h"
 #include "pmm.h"
 #include "vmm.h"
+#include "kheap.h"
 
 // Forward declarations
 static void print_memory_map(boot_info_t *info);
@@ -102,8 +103,9 @@ void kernel_main(boot_info_t *boot_info) {
     vmm_init(boot_info);
     console_print("  [OK] VMM (Virtual Memory Manager)\n");
 
-    // TODO: Initialize heap
-    console_print("  [ ] Kernel Heap\n");
+    // Initialize Kernel Heap
+    kheap_init(boot_info);
+    console_print("  [OK] Kernel Heap\n");
 
     // TODO: Initialize Mach layer
     console_print("  [ ] Mach Microkernel Layer\n");

@@ -77,7 +77,8 @@ KERNEL_OBJS = $(BUILD_DIR)/multiboot.o \
               $(BUILD_DIR)/idt_asm.o \
               $(BUILD_DIR)/pmm.o \
               $(BUILD_DIR)/vmm.o \
-              $(BUILD_DIR)/vmm_asm.o
+              $(BUILD_DIR)/vmm_asm.o \
+              $(BUILD_DIR)/kheap.o
 
 # Default target
 .PHONY: all
@@ -157,6 +158,10 @@ $(BUILD_DIR)/vmm.o: $(KERNEL_DIR)/vmm.c $(KERNEL_DIR)/vmm.h $(KERNEL_DIR)/pmm.h 
 $(BUILD_DIR)/vmm_asm.o: $(KERNEL_DIR)/vmm_asm.S | $(BUILD_DIR)
 	@echo "[AS] Assembling VMM functions..."
 	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
+
+$(BUILD_DIR)/kheap.o: $(KERNEL_DIR)/kheap.c $(KERNEL_DIR)/kheap.h $(KERNEL_DIR)/pmm.h $(KERNEL_DIR)/vmm.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
+	@echo "[CC] Compiling kernel heap..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
 # Create kernel linker script
 $(KERNEL_DIR)/linker.ld:
