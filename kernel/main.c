@@ -32,36 +32,42 @@ void kernel_main(boot_info_t *boot_info) {
 
     // Validate boot info
     console_print("[BOOT] Validating boot information...\n");
+
+    // Check if we have valid boot info
+    bool has_boot_info = false;
     if (!boot_info) {
-        console_print("[ERROR] Boot info is NULL!\n");
-        goto halt;
-    }
-
-    if (boot_info->magic != AURORA_BOOT_MAGIC) {
-        console_print("[ERROR] Invalid boot magic: ");
+        console_print("[WARNING] Boot info is NULL\n");
+        console_print("[INFO] Running in TEST MODE (no bootloader)\n");
+    } else if (boot_info->magic != AURORA_BOOT_MAGIC) {
+        console_print("[WARNING] Invalid boot magic: ");
         console_print_hex(boot_info->magic);
-        console_print("\n");
-        goto halt;
+        console_print("\n[INFO] Running in TEST MODE\n");
+    } else {
+        console_print("[OK] Boot info validated\n");
+        has_boot_info = true;
     }
 
-    console_print("[OK] Boot info validated\n");
+    // Print boot information if available
+    if (has_boot_info) {
+        console_print("\n[BOOT] Boot Information:\n");
+        console_print("  Kernel Physical Base: ");
+        console_print_hex(boot_info->kernel_physical_base);
+        console_print("\n  Kernel Virtual Base:  ");
+        console_print_hex(boot_info->kernel_virtual_base);
+        console_print("\n  Kernel Size:          ");
+        console_print_hex(boot_info->kernel_size);
+        console_print(" bytes\n");
 
-    // Print boot information
-    console_print("\n[BOOT] Boot Information:\n");
-    console_print("  Kernel Physical Base: ");
-    console_print_hex(boot_info->kernel_physical_base);
-    console_print("\n  Kernel Virtual Base:  ");
-    console_print_hex(boot_info->kernel_virtual_base);
-    console_print("\n  Kernel Size:          ");
-    console_print_hex(boot_info->kernel_size);
-    console_print(" bytes\n");
-
-    // Print memory map
-    console_print("\n[BOOT] Memory Map:\n");
-    print_memory_map(boot_info);
+        // Print memory map
+        console_print("\n[BOOT] Memory Map:\n");
+        print_memory_map(boot_info);
+    } else {
+        console_print("\n[TEST MODE] No boot information available\n");
+        console_print("[TEST MODE] Kernel loaded by QEMU or debugger\n");
+    }
 
     // Print graphics info if available
-    if (boot_info->graphics_info) {
+    if (has_boot_info && boot_info->graphics_info) {
         graphics_info_t *gfx = boot_info->graphics_info;
         console_print("\n[BOOT] Graphics Information:\n");
         console_print("  Framebuffer: ");
@@ -103,7 +109,7 @@ void kernel_main(boot_info_t *boot_info) {
     console_print("\n[KERNEL] Initialization incomplete - halting\n");
     console_print("(This is expected for initial stub)\n");
 
-halt:
+    // Halt the system
     console_print("\n[HALT] System halted\n");
     while (1) {
         __asm__ __volatile__("hlt");

@@ -188,6 +188,95 @@ KERNEL_CC_FLAGS = ... \
 
 ---
 
+### [2025-11-21] Unused Label After NULL Safety Refactoring (AuroraOS)
+**Phase**: Phase 1 - NULL safety implementation for test mode
+**Component**: kernel/main.c - Error handling refactor
+**Description**: After refactoring kernel_main() to handle NULL boot_info gracefully instead of using goto statements, compilation failed with unused label error.
+
+**Error**:
+```
+kernel/main.c:112:1: error: label 'halt' defined but not used [-Werror=unused-label]
+  112 | halt:
+      | ^~~~
+cc1: all warnings being treated as errors
+```
+
+**Root Cause**:
+During refactoring to add NULL safety checks, the code was changed from:
+```c
+// Old code (with goto):
+if (!boot_info) {
+    console_print("[ERROR] Boot info is NULL!\n");
+    goto halt;  // Jump to halt label
+}
+
+halt:
+    console_print("\n[HALT] System halted\n");
+    while (1) { __asm__ __volatile__("hlt"); }
+```
+
+To:
+```c
+// New code (without goto):
+if (!boot_info) {
+    console_print("[WARNING] Boot info is NULL\n");
+    console_print("[INFO] Running in TEST MODE\n");
+    // Continue execution, no goto
+}
+
+halt:  // ← Label still defined but never used!
+    console_print("\n[HALT] System halted\n");
+    while (1) { __asm__ __volatile__("hlt"); }
+```
+
+The goto statements were removed to allow graceful handling of missing boot_info (test mode), but the `halt:` label was left in place. With `-Werror` (treat warnings as errors), this became a compilation failure.
+
+**Solution**:
+Remove the unused label since we no longer use goto for error handling:
+```c
+// Fixed code:
+console_print("\n[KERNEL] Initialization incomplete - halting\n");
+console_print("(This is expected for initial stub)\n");
+
+// Halt the system
+console_print("\n[HALT] System halted\n");
+while (1) {
+    __asm__ __volatile__("hlt");
+}
+```
+
+**Debugging Process**:
+1. Identified that NULL safety refactor removed goto statements
+2. Noticed halt label was still defined but unreachable
+3. Removed label, kept halt loop as natural code flow
+4. ✅ Kernel compiled successfully
+
+**Result**: ✅ Kernel builds successfully with NULL safety, can run in test mode without bootloader
+
+**Prevention**:
+- **Remove labels when removing goto statements** during refactoring
+- Use compiler warnings to catch unused labels early
+- Consider using structured error handling instead of goto when possible
+- When refactoring control flow, check for orphaned labels
+
+**Commit**: (pending)
+
+**Key Lesson**: When refactoring goto-based error handling to structured code:
+1. Remove the goto statements
+2. Remove the corresponding labels
+3. Ensure code flow naturally reaches cleanup/halt code
+4. Verify compilation with `-Werror` enabled
+
+**Related NULL Safety Changes**:
+This fix was part of making kernel robust for testing without a bootloader:
+- Added `bool has_boot_info` flag to track validity
+- Check `!boot_info` before dereferencing
+- Check `boot_info->magic != AURORA_BOOT_MAGIC` for validity
+- Allow kernel to run in TEST MODE when boot_info is NULL or invalid
+- Print appropriate warnings instead of crashing
+
+---
+
 ## Tips and Lessons Learned
 
 ### General
