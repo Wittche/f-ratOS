@@ -18,6 +18,7 @@
 #include "process.h"
 #include "scheduler.h"
 #include "syscall.h"
+#include "kthread_test.h"
 
 // Forward declarations
 static void print_memory_map(boot_info_t *info);
@@ -132,17 +133,27 @@ void kernel_main(boot_info_t *boot_info) {
     syscall_init();
     console_print("  [OK] System Call Interface\n");
 
+    console_print("\n[KERNEL] All subsystems initialized!\n\n");
+
+    // Initialize test kernel threads
+    kthread_test_init();
+
     // TODO: Initialize Mach layer
-    console_print("  [ ] Mach Microkernel Layer\n");
+    console_print("\n  [ ] Mach Microkernel Layer (TODO)\n");
 
     // TODO: Initialize BSD layer
-    console_print("  [ ] BSD Layer\n");
+    console_print("  [ ] BSD Layer (TODO)\n\n");
 
-    console_print("\n[KERNEL] Initialization incomplete - halting\n");
-    console_print("(This is expected for initial stub)\n");
+    console_print("=====================================\n");
+    console_print("  AuroraOS Kernel Ready!\n");
+    console_print("=====================================\n");
 
-    // Halt the system
-    console_print("\n[HALT] System halted\n");
+    // Start kernel threads and scheduler
+    // This function will not return - scheduler takes over
+    kthread_test_start();
+
+    // Should never reach here
+    console_print("\n[ERROR] Returned from kthread_test_start()!\n");
     while (1) {
         __asm__ __volatile__("hlt");
     }

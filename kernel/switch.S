@@ -80,7 +80,7 @@ load_new_context:
     movq 96(%rsi), %r12
     movq 104(%rsi), %r13
     movq 112(%rsi), %r14
-    movq 115(%rsi), %r15
+    movq 120(%rsi), %r15
 
     # Restore RFLAGS
     movq 136(%rsi), %rax
