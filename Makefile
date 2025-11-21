@@ -75,7 +75,9 @@ KERNEL_OBJS = $(BUILD_DIR)/multiboot.o \
               $(BUILD_DIR)/gdt_asm.o \
               $(BUILD_DIR)/idt.o \
               $(BUILD_DIR)/idt_asm.o \
-              $(BUILD_DIR)/pmm.o
+              $(BUILD_DIR)/pmm.o \
+              $(BUILD_DIR)/vmm.o \
+              $(BUILD_DIR)/vmm_asm.o
 
 # Default target
 .PHONY: all
@@ -147,6 +149,14 @@ $(BUILD_DIR)/idt_asm.o: $(KERNEL_DIR)/idt_asm.S | $(BUILD_DIR)
 $(BUILD_DIR)/pmm.o: $(KERNEL_DIR)/pmm.c $(KERNEL_DIR)/pmm.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/boot.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
 	@echo "[CC] Compiling PMM..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/vmm.o: $(KERNEL_DIR)/vmm.c $(KERNEL_DIR)/vmm.h $(KERNEL_DIR)/pmm.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/boot.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
+	@echo "[CC] Compiling VMM..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/vmm_asm.o: $(KERNEL_DIR)/vmm_asm.S | $(BUILD_DIR)
+	@echo "[AS] Assembling VMM functions..."
+	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
 
 # Create kernel linker script
 $(KERNEL_DIR)/linker.ld:

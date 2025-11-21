@@ -11,6 +11,7 @@
 #include "gdt.h"
 #include "idt.h"
 #include "pmm.h"
+#include "vmm.h"
 
 // Forward declarations
 static void print_memory_map(boot_info_t *info);
@@ -97,8 +98,9 @@ void kernel_main(boot_info_t *boot_info) {
     pmm_init(boot_info);
     console_print("  [OK] PMM (Physical Memory Manager)\n");
 
-    // TODO: Initialize virtual memory/paging
-    console_print("  [ ] VMM (Virtual Memory Manager)\n");
+    // Initialize Virtual Memory Manager
+    vmm_init(boot_info);
+    console_print("  [OK] VMM (Virtual Memory Manager)\n");
 
     // TODO: Initialize heap
     console_print("  [ ] Kernel Heap\n");

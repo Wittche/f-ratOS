@@ -1,0 +1,393 @@
+/**
+ * AuroraOS Kernel - Virtual Memory Manager Implementation
+ *
+ * Implements x86_64 4-level paging with higher-half kernel
+ */
+
+#include "vmm.h"
+#include "pmm.h"
+#include "console.h"
+#include "types.h"
+#include "boot.h"
+
+// Global page table pointers
+static page_table_t *kernel_pml4 = NULL;
+static bool vmm_initialized = false;
+
+// VMM state
+static struct {
+    uint64_t pml4_physical;
+    uint64_t mapped_pages;
+    uint64_t kernel_pages;
+    uint64_t page_tables_allocated;
+} vmm_state = {0};
+
+// Helper macros
+#define ALIGN_DOWN(addr, align) ((addr) & ~((align) - 1))
+#define ALIGN_UP(addr, align)   (((addr) + (align) - 1) & ~((align) - 1))
+#define IS_ALIGNED(addr, align) (((addr) & ((align) - 1)) == 0)
+
+#define PTE_ADDR_MASK  0x000FFFFFFFFFF000ULL  // Physical address bits
+#define PTE_FLAGS_MASK 0xFFF0000000000FFFULL  // Flag bits
+
+// Extract physical address from PTE
+static inline uint64_t pte_get_addr(pte_t pte) {
+    return pte & PTE_ADDR_MASK;
+}
+
+// Create PTE from address and flags
+static inline pte_t pte_create(uint64_t phys_addr, uint64_t flags) {
+    return (phys_addr & PTE_ADDR_MASK) | (flags & PTE_FLAGS_MASK);
+}
+
+/**
+ * Parse virtual address into components
+ */
+virt_addr_t vmm_parse_address(uint64_t addr) {
+    virt_addr_t vaddr = {0};
+
+    vaddr.offset     = (addr >> 0)  & 0xFFF;  // 12 bits
+    vaddr.pt_index   = (addr >> 12) & 0x1FF;  // 9 bits
+    vaddr.pd_index   = (addr >> 21) & 0x1FF;  // 9 bits
+    vaddr.pdpt_index = (addr >> 30) & 0x1FF;  // 9 bits
+    vaddr.pml4_index = (addr >> 39) & 0x1FF;  // 9 bits
+    vaddr.sign_ext   = (addr >> 48) & 0xFFFF; // 16 bits
+
+    return vaddr;
+}
+
+/**
+ * Construct virtual address from components
+ */
+uint64_t vmm_construct_address(virt_addr_t *vaddr) {
+    uint64_t addr = 0;
+
+    addr |= ((uint64_t)vaddr->offset     << 0);
+    addr |= ((uint64_t)vaddr->pt_index   << 12);
+    addr |= ((uint64_t)vaddr->pd_index   << 21);
+    addr |= ((uint64_t)vaddr->pdpt_index << 30);
+    addr |= ((uint64_t)vaddr->pml4_index << 39);
+
+    // Sign extend bit 47
+    if (addr & (1ULL << 47)) {
+        addr |= 0xFFFF000000000000ULL;
+    }
+
+    return addr;
+}
+
+/**
+ * Flush TLB (Translation Lookaside Buffer)
+ */
+void vmm_flush_tlb(void) {
+    __asm__ __volatile__(
+        "movq %%cr3, %%rax\n"
+        "movq %%rax, %%cr3\n"
+        ::: "rax"
+    );
+}
+
+/**
+ * Flush single TLB entry
+ */
+void vmm_flush_tlb_single(uint64_t virt_addr) {
+    __asm__ __volatile__(
+        "invlpg (%0)"
+        :: "r"(virt_addr)
+        : "memory"
+    );
+}
+
+/**
+ * Get page table entry for virtual address
+ * Creates intermediate tables if needed
+ *
+ * @param virt_addr Virtual address
+ * @param create If true, create missing page tables
+ * @return Pointer to PTE or NULL if not present and create=false
+ */
+pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
+    if (!vmm_initialized) {
+        return NULL;
+    }
+
+    virt_addr_t vaddr = vmm_parse_address(virt_addr);
+
+    // Walk PML4
+    pte_t *pml4_entry = &kernel_pml4->entries[vaddr.pml4_index];
+    page_table_t *pdpt;
+
+    if (!(*pml4_entry & PTE_PRESENT)) {
+        if (!create) return NULL;
+
+        // Allocate new PDPT
+        uint64_t pdpt_phys = pmm_alloc_frame();
+        if (pdpt_phys == 0) return NULL;
+
+        *pml4_entry = pte_create(pdpt_phys, PTE_KERNEL_FLAGS);
+        vmm_state.page_tables_allocated++;
+
+        // Zero out the new table
+        pdpt = (page_table_t*)pdpt_phys;
+        for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+            pdpt->entries[i] = 0;
+        }
+    } else {
+        pdpt = (page_table_t*)pte_get_addr(*pml4_entry);
+    }
+
+    // Walk PDPT
+    pte_t *pdpt_entry = &pdpt->entries[vaddr.pdpt_index];
+    page_table_t *pd;
+
+    if (!(*pdpt_entry & PTE_PRESENT)) {
+        if (!create) return NULL;
+
+        // Allocate new PD
+        uint64_t pd_phys = pmm_alloc_frame();
+        if (pd_phys == 0) return NULL;
+
+        *pdpt_entry = pte_create(pd_phys, PTE_KERNEL_FLAGS);
+        vmm_state.page_tables_allocated++;
+
+        // Zero out the new table
+        pd = (page_table_t*)pd_phys;
+        for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+            pd->entries[i] = 0;
+        }
+    } else {
+        pd = (page_table_t*)pte_get_addr(*pdpt_entry);
+    }
+
+    // Walk PD
+    pte_t *pd_entry = &pd->entries[vaddr.pd_index];
+    page_table_t *pt;
+
+    if (!(*pd_entry & PTE_PRESENT)) {
+        if (!create) return NULL;
+
+        // Allocate new PT
+        uint64_t pt_phys = pmm_alloc_frame();
+        if (pt_phys == 0) return NULL;
+
+        *pd_entry = pte_create(pt_phys, PTE_KERNEL_FLAGS);
+        vmm_state.page_tables_allocated++;
+
+        // Zero out the new table
+        pt = (page_table_t*)pt_phys;
+        for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+            pt->entries[i] = 0;
+        }
+    } else {
+        pt = (page_table_t*)pte_get_addr(*pd_entry);
+    }
+
+    // Return pointer to final PT entry
+    return &pt->entries[vaddr.pt_index];
+}
+
+/**
+ * Map a single page
+ *
+ * @param virt_addr Virtual address (will be page-aligned)
+ * @param phys_addr Physical address (will be page-aligned)
+ * @param flags Page flags (PTE_PRESENT, PTE_WRITE, etc.)
+ * @return true on success, false on failure
+ */
+bool vmm_map_page(uint64_t virt_addr, uint64_t phys_addr, uint64_t flags) {
+    // Align addresses
+    virt_addr = ALIGN_DOWN(virt_addr, PAGE_SIZE);
+    phys_addr = ALIGN_DOWN(phys_addr, PAGE_SIZE);
+
+    // Get or create PTE
+    pte_t *pte = vmm_get_pte(virt_addr, true);
+    if (!pte) {
+        return false;
+    }
+
+    // Check if already mapped
+    if (*pte & PTE_PRESENT) {
+        // Already mapped - update flags
+        *pte = pte_create(phys_addr, flags | PTE_PRESENT);
+    } else {
+        // New mapping
+        *pte = pte_create(phys_addr, flags | PTE_PRESENT);
+        vmm_state.mapped_pages++;
+    }
+
+    // Flush TLB for this page
+    vmm_flush_tlb_single(virt_addr);
+
+    return true;
+}
+
+/**
+ * Unmap a single page
+ */
+bool vmm_unmap_page(uint64_t virt_addr) {
+    virt_addr = ALIGN_DOWN(virt_addr, PAGE_SIZE);
+
+    pte_t *pte = vmm_get_pte(virt_addr, false);
+    if (!pte || !(*pte & PTE_PRESENT)) {
+        return false;
+    }
+
+    *pte = 0;
+    vmm_state.mapped_pages--;
+
+    vmm_flush_tlb_single(virt_addr);
+    return true;
+}
+
+/**
+ * Get physical address for virtual address
+ */
+uint64_t vmm_get_physical(uint64_t virt_addr) {
+    uint64_t offset = virt_addr & 0xFFF;
+    virt_addr = ALIGN_DOWN(virt_addr, PAGE_SIZE);
+
+    pte_t *pte = vmm_get_pte(virt_addr, false);
+    if (!pte || !(*pte & PTE_PRESENT)) {
+        return 0;
+    }
+
+    return pte_get_addr(*pte) + offset;
+}
+
+/**
+ * Map a range of pages
+ */
+bool vmm_map_range(uint64_t virt_addr, uint64_t phys_addr, uint64_t size, uint64_t flags) {
+    uint64_t virt_end = virt_addr + size;
+
+    // Align start down and end up
+    virt_addr = ALIGN_DOWN(virt_addr, PAGE_SIZE);
+    phys_addr = ALIGN_DOWN(phys_addr, PAGE_SIZE);
+    virt_end = ALIGN_UP(virt_end, PAGE_SIZE);
+
+    for (uint64_t v = virt_addr, p = phys_addr; v < virt_end; v += PAGE_SIZE, p += PAGE_SIZE) {
+        if (!vmm_map_page(v, p, flags)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Unmap a range of pages
+ */
+bool vmm_unmap_range(uint64_t virt_addr, uint64_t size) {
+    uint64_t virt_end = virt_addr + size;
+
+    virt_addr = ALIGN_DOWN(virt_addr, PAGE_SIZE);
+    virt_end = ALIGN_UP(virt_end, PAGE_SIZE);
+
+    for (uint64_t v = virt_addr; v < virt_end; v += PAGE_SIZE) {
+        vmm_unmap_page(v);
+    }
+
+    return true;
+}
+
+/**
+ * Initialize Virtual Memory Manager
+ */
+void vmm_init(boot_info_t *boot_info) {
+    console_print("[VMM] Initializing Virtual Memory Manager...\n");
+
+    // Allocate PML4 (top-level page table)
+    uint64_t pml4_phys = pmm_alloc_frame();
+    if (pml4_phys == 0) {
+        console_print("[VMM] ERROR: Failed to allocate PML4\n");
+        return;
+    }
+
+    kernel_pml4 = (page_table_t*)pml4_phys;
+    vmm_state.pml4_physical = pml4_phys;
+    vmm_state.page_tables_allocated = 1;
+
+    // Zero out PML4
+    for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+        kernel_pml4->entries[i] = 0;
+    }
+
+    console_print("[VMM] PML4 allocated at ");
+    console_print_hex(pml4_phys);
+    console_print("\n");
+
+    vmm_initialized = true;
+
+    // Identity map first 4MB (for VGA, BIOS, bootloader compatibility)
+    console_print("[VMM] Identity mapping first 4MB...\n");
+    if (!vmm_map_range(0x0, 0x0, 4 * 1024 * 1024, PTE_KERNEL_FLAGS)) {
+        console_print("[VMM] ERROR: Failed to identity map\n");
+        return;
+    }
+    vmm_state.kernel_pages += 1024; // 4MB = 1024 pages
+
+    // Map kernel to higher-half (if boot_info available)
+    if (boot_info && boot_info->magic == AURORA_BOOT_MAGIC) {
+        uint64_t kernel_size = boot_info->kernel_size;
+        uint64_t kernel_phys = boot_info->kernel_physical_base;
+        uint64_t kernel_virt = KERNEL_VIRTUAL_BASE;
+
+        console_print("[VMM] Mapping kernel to higher-half...\n");
+        console_print("[VMM]   Physical: ");
+        console_print_hex(kernel_phys);
+        console_print("\n[VMM]   Virtual:  ");
+        console_print_hex(kernel_virt);
+        console_print("\n[VMM]   Size:     ");
+        console_print_hex(kernel_size);
+        console_print(" bytes\n");
+
+        if (!vmm_map_range(kernel_virt, kernel_phys, kernel_size, PTE_KERNEL_FLAGS)) {
+            console_print("[VMM] ERROR: Failed to map kernel\n");
+            return;
+        }
+
+        uint64_t kernel_pages = (kernel_size + PAGE_SIZE - 1) / PAGE_SIZE;
+        vmm_state.kernel_pages += kernel_pages;
+    } else {
+        // Test mode: Map kernel at 1MB
+        console_print("[VMM] Test mode: Identity mapping kernel at 1MB...\n");
+        uint64_t kernel_size = 1024 * 1024; // Assume 1MB kernel
+        if (!vmm_map_range(KERNEL_PHYSICAL_BASE, KERNEL_PHYSICAL_BASE,
+                          kernel_size, PTE_KERNEL_FLAGS)) {
+            console_print("[VMM] ERROR: Failed to map kernel\n");
+            return;
+        }
+        vmm_state.kernel_pages += 256; // 1MB = 256 pages
+    }
+
+    // Setup recursive mapping (last PML4 entry points to itself)
+    console_print("[VMM] Setting up recursive mapping...\n");
+    kernel_pml4->entries[RECURSIVE_SLOT] = pte_create(pml4_phys, PTE_KERNEL_FLAGS);
+
+    console_print("[VMM] Initialization complete\n");
+    console_print("[VMM]   Page tables allocated: ");
+    console_print_dec(vmm_state.page_tables_allocated);
+    console_print("\n[VMM]   Pages mapped: ");
+    console_print_dec(vmm_state.mapped_pages);
+    console_print("\n[VMM]   Kernel pages: ");
+    console_print_dec(vmm_state.kernel_pages);
+    console_print("\n");
+}
+
+/**
+ * Print VMM statistics
+ */
+void vmm_print_stats(void) {
+    console_print("\n[VMM] Statistics:\n");
+    console_print("  PML4 Physical:     ");
+    console_print_hex(vmm_state.pml4_physical);
+    console_print("\n  Page Tables:       ");
+    console_print_dec(vmm_state.page_tables_allocated);
+    console_print("\n  Total Pages:       ");
+    console_print_dec(vmm_state.mapped_pages);
+    console_print("\n  Kernel Pages:      ");
+    console_print_dec(vmm_state.kernel_pages);
+    console_print("\n  Virtual Memory:    ");
+    console_print_dec(vmm_state.mapped_pages * 4);
+    console_print(" KB\n");
+}
