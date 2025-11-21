@@ -7,6 +7,11 @@
 
 #include "efi.h"
 
+// Define NULL if not defined
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
+
 // Include kernel boot structures
 typedef struct {
     uint32_t type;

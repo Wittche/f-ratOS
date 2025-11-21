@@ -94,8 +94,8 @@ $(BOOTLOADER_EFI): $(BOOT_OBJS) | $(BUILD_DIR)
 	@echo "[LD] Linking UEFI bootloader..."
 	$(BOOT_CC) $(EFI_LD_FLAGS) -o $@ $^
 
-$(BUILD_DIR)/boot.o: $(BOOT_DIR)/boot.c $(BOOT_DIR)/efi.h | $(BUILD_DIR)
-	@echo "[CC] Compiling bootloader..."
+$(BUILD_DIR)/boot.o: $(BOOT_DIR)/boot_simple.c $(BOOT_DIR)/efi.h | $(BUILD_DIR)
+	@echo "[CC] Compiling bootloader (simplified)..."
 	$(BOOT_CC) $(EFI_CC_FLAGS) -c $< -o $@
 
 # Build kernel
@@ -162,9 +162,15 @@ $(KERNEL_DIR)/linker.ld:
 iso: $(BOOTLOADER_EFI) $(KERNEL_BIN)
 	@echo "ISO creation not yet implemented"
 
+# Create ESP (EFI System Partition) image
+.PHONY: esp
+esp: $(BOOTLOADER_EFI) $(KERNEL_BIN)
+	@echo "Creating ESP image..."
+	@bash scripts/create_esp.sh
+
 # Run with QEMU (UEFI)
 .PHONY: run
-run: $(BOOTLOADER_EFI) $(KERNEL_BIN)
+run: esp
 	@echo "Running AuroraOS in QEMU (UEFI mode)..."
 	@echo "Note: Requires OVMF UEFI firmware"
 	qemu-system-x86_64 \
@@ -197,9 +203,11 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  all        - Build bootloader and kernel (default)"
+	@echo "  kernel     - Build kernel only"
+	@echo "  esp        - Create ESP (EFI System Partition) image"
 	@echo "  clean      - Remove build artifacts"
-	@echo "  run        - Run in QEMU with UEFI"
-	@echo "  run-bios   - Run in QEMU with legacy BIOS"
+	@echo "  run        - Run in QEMU with UEFI (auto-creates ESP)"
+	@echo "  run-bios   - Run in QEMU with legacy BIOS (Multiboot test)"
 	@echo "  iso        - Create bootable ISO (not implemented)"
 	@echo "  help       - Show this help"
 	@echo ""
