@@ -15,6 +15,8 @@
 #include "kheap.h"
 #include "timer.h"
 #include "keyboard.h"
+#include "process.h"
+#include "scheduler.h"
 
 // Forward declarations
 static void print_memory_map(boot_info_t *info);
@@ -117,14 +119,19 @@ void kernel_main(boot_info_t *boot_info) {
     keyboard_init();
     console_print("  [OK] Keyboard (PS/2)\n");
 
+    // Initialize Process Management
+    process_init();
+    console_print("  [OK] Process Management\n");
+
+    // Initialize Scheduler
+    scheduler_init();
+    console_print("  [OK] Scheduler\n");
+
     // TODO: Initialize Mach layer
     console_print("  [ ] Mach Microkernel Layer\n");
 
     // TODO: Initialize BSD layer
     console_print("  [ ] BSD Layer\n");
-
-    // TODO: Initialize scheduler
-    console_print("  [ ] Scheduler\n");
 
     console_print("\n[KERNEL] Initialization incomplete - halting\n");
     console_print("(This is expected for initial stub)\n");

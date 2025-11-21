@@ -80,7 +80,10 @@ KERNEL_OBJS = $(BUILD_DIR)/multiboot.o \
               $(BUILD_DIR)/vmm_asm.o \
               $(BUILD_DIR)/kheap.o \
               $(BUILD_DIR)/timer.o \
-              $(BUILD_DIR)/keyboard.o
+              $(BUILD_DIR)/keyboard.o \
+              $(BUILD_DIR)/process.o \
+              $(BUILD_DIR)/scheduler.o \
+              $(BUILD_DIR)/switch.o
 
 # Default target
 .PHONY: all
@@ -165,13 +168,25 @@ $(BUILD_DIR)/kheap.o: $(KERNEL_DIR)/kheap.c $(KERNEL_DIR)/kheap.h $(KERNEL_DIR)/
 	@echo "[CC] Compiling kernel heap..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
-$(BUILD_DIR)/timer.o: $(KERNEL_DIR)/timer.c $(KERNEL_DIR)/timer.h $(KERNEL_DIR)/io.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
+$(BUILD_DIR)/timer.o: $(KERNEL_DIR)/timer.c $(KERNEL_DIR)/timer.h $(KERNEL_DIR)/io.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/scheduler.h | $(BUILD_DIR)
 	@echo "[CC] Compiling timer driver..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
 $(BUILD_DIR)/keyboard.o: $(KERNEL_DIR)/keyboard.c $(KERNEL_DIR)/keyboard.h $(KERNEL_DIR)/io.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
 	@echo "[CC] Compiling keyboard driver..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/process.o: $(KERNEL_DIR)/process.c $(KERNEL_DIR)/process.h $(KERNEL_DIR)/kheap.h $(KERNEL_DIR)/vmm.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
+	@echo "[CC] Compiling process management..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/scheduler.o: $(KERNEL_DIR)/scheduler.c $(KERNEL_DIR)/scheduler.h $(KERNEL_DIR)/process.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
+	@echo "[CC] Compiling scheduler..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/switch.o: $(KERNEL_DIR)/switch.S | $(BUILD_DIR)
+	@echo "[AS] Assembling context switch..."
+	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
 
 # Create kernel linker script
 $(KERNEL_DIR)/linker.ld:

@@ -8,6 +8,7 @@
 #include "io.h"
 #include "console.h"
 #include "types.h"
+#include "scheduler.h"
 
 // Timer state
 static struct {
@@ -91,6 +92,9 @@ void timer_irq_handler(void) {
 
     // Increment tick counter
     timer_state.ticks++;
+
+    // Call scheduler tick
+    scheduler_tick();
 
     // Call registered callback if any
     if (timer_state.callback) {
