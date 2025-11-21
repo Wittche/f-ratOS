@@ -26,20 +26,22 @@ typedef struct {
 } __attribute__((packed)) gdt_ptr_t;
 
 // Number of GDT entries
-#define GDT_ENTRIES 5
+#define GDT_ENTRIES 6
 
 // GDT entry indices
 #define GDT_NULL        0  // Null descriptor (required)
 #define GDT_KERNEL_CODE 1  // Kernel code segment (0x08)
 #define GDT_KERNEL_DATA 2  // Kernel data segment (0x10)
-#define GDT_USER_CODE   3  // User code segment (0x18) - future
-#define GDT_USER_DATA   4  // User data segment (0x20) - future
+#define GDT_USER_CODE32 3  // User code segment 32-bit (0x18) - compatibility mode
+#define GDT_USER_DATA   4  // User data segment (0x20)
+#define GDT_USER_CODE64 5  // User code segment 64-bit (0x28) - for SYSRET
 
 // Segment selector values (index * 8)
 #define KERNEL_CODE_SELECTOR 0x08
 #define KERNEL_DATA_SELECTOR 0x10
-#define USER_CODE_SELECTOR   0x18
+#define USER_CODE32_SELECTOR 0x18  // For 32-bit compatibility mode
 #define USER_DATA_SELECTOR   0x20
+#define USER_CODE64_SELECTOR 0x28  // For 64-bit mode (used by SYSRET)
 
 // Access byte flags
 #define GDT_ACCESS_PRESENT      0x80  // Present bit
