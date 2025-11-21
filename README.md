@@ -28,15 +28,21 @@ AuroraOS/
 
 ## Development Status
 
-**Phase 1: Bootloader + Minimal Kernel** (In Progress)
+**Phase 1: Core Infrastructure** ✅ (Complete)
 - [x] Project structure
 - [x] UEFI bootloader implementation (simplified)
-- [x] Kernel stub with NULL safety
-- [x] Basic console output (VGA text mode)
+- [x] Kernel entry point (64-bit long mode)
+- [x] VGA console output
+- [x] GDT (Global Descriptor Table)
+- [x] IDT (Interrupt Descriptor Table)
+- [x] PIC (8259) remapping
+- [x] Exception and IRQ handlers
 - [x] Build system (Makefile)
-- [x] ESP image creation
-- [ ] Interrupt handling
-- [ ] Memory management (PMM/VMM)
+
+**Phase 2: Memory Management** (Next)
+- [ ] Physical Memory Manager (PMM)
+- [ ] Virtual Memory Manager (VMM)
+- [ ] Kernel heap allocator
 
 ## Build Requirements
 
@@ -57,6 +63,21 @@ sudo apt update
 sudo apt install build-essential clang lld qemu-system-x86 ovmf
 ```
 
+## Quick Start
+
+**Build and Test in One Command:**
+```bash
+make test
+```
+
+This will:
+1. Build bootloader (BOOTX64.EFI - 5KB)
+2. Build kernel (kernel.bin - 9.4KB)
+3. Launch QEMU for testing
+4. Show kernel output in VGA console
+
+**Or use individual commands:**
+
 ## Building
 
 ### Build Everything
@@ -66,7 +87,7 @@ make all
 
 This builds:
 - `build/BOOTX64.EFI` - UEFI bootloader (5KB)
-- `build/kernel.bin` - Kernel binary (3KB)
+- `build/kernel.bin` - Kernel binary (9.4KB)
 - `build/kernel.elf` - Kernel with debug symbols
 
 ### Build Kernel Only
@@ -110,40 +131,27 @@ make run
 Expected output:
 ```
 =====================================
-   AuroraOS UEFI Bootloader v0.1
-   (Simplified Test Version)
-=====================================
-
-UEFI Firmware: EDK II
-Revision: 0x...
-
-Getting memory map...
-Memory map obtained: XX entries
-Getting Graphics Output Protocol...
-GOP found!
-  Framebuffer: 0x...
-  Resolution: 1024x768
-
-Preparing boot_info structure...
-Boot info magic: 0x41555230524F0000
-Kernel entry point: 0x10000C
-
-Exiting UEFI Boot Services...
-
-=====================================
       AuroraOS Kernel v0.1
   Hybrid Kernel - XNU Inspired
 =====================================
 
 [BOOT] Validating boot information...
-[OK] Boot info validated
-
-[BOOT] Boot Information:
-  Kernel Physical Base: 0x100000
-  ...
+[WARNING] Boot info is NULL
+[INFO] Running in TEST MODE (no bootloader)
 
 [KERNEL] Initializing subsystems...
-  [ ] GDT (Global Descriptor Table)
+[GDT] Initializing Global Descriptor Table...
+[GDT] Loaded with 5 entries
+[GDT] Kernel CS=0x8, DS=0x10
+  [OK] GDT (Global Descriptor Table)
+
+[IDT] Initializing Interrupt Descriptor Table...
+[IDT] Loaded with 256 entries
+[IDT] Exceptions: 0-31, IRQs: 32-47
+  [OK] IDT (Interrupt Descriptor Table)
+
+  [ ] PMM (Physical Memory Manager)
+  [ ] VMM (Virtual Memory Manager)
   ...
 
 [HALT] System halted

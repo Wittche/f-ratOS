@@ -209,6 +209,28 @@ run-bios: $(KERNEL_ELF)
 		-m 256M \
 		-serial stdio
 
+# Quick test - Build and run in one command
+.PHONY: test
+test: all
+	@echo ""
+	@echo "=========================================="
+	@echo "  Quick Test - Running AuroraOS Kernel"
+	@echo "=========================================="
+	@echo ""
+	@echo "Build Summary:"
+	@echo "  Bootloader: $$(ls -lh $(BOOTLOADER_EFI) | awk '{print $$5}')"
+	@echo "  Kernel:     $$(ls -lh $(KERNEL_BIN) | awk '{print $$5}')"
+	@echo ""
+	@echo "Starting QEMU..."
+	@echo "Press Ctrl+C to exit"
+	@echo ""
+	@qemu-system-x86_64 \
+		-kernel $(KERNEL_ELF) \
+		-m 256M \
+		-serial stdio \
+		-display curses \
+		2>&1 || (echo ""; echo "ERROR: QEMU not found!"; echo "Install: sudo apt-get install qemu-system-x86"; false)
+
 # Clean build artifacts
 .PHONY: clean
 clean:
@@ -219,20 +241,38 @@ clean:
 # Help
 .PHONY: help
 help:
-	@echo "AuroraOS Build System"
+	@echo "=========================================="
+	@echo "      AuroraOS Build System v0.1"
+	@echo "=========================================="
 	@echo ""
-	@echo "Targets:"
+	@echo "Build Targets:"
 	@echo "  all        - Build bootloader and kernel (default)"
 	@echo "  kernel     - Build kernel only"
+	@echo "  clean      - Remove all build artifacts"
+	@echo ""
+	@echo "Test Targets:"
+	@echo "  test       - Build everything and run quick test (recommended)"
+	@echo "  run-bios   - Run kernel with legacy Multiboot (simple test)"
+	@echo "  run        - Run with UEFI bootloader (requires OVMF)"
+	@echo ""
+	@echo "Advanced Targets:"
 	@echo "  esp        - Create ESP (EFI System Partition) image"
-	@echo "  clean      - Remove build artifacts"
-	@echo "  run        - Run in QEMU with UEFI (auto-creates ESP)"
-	@echo "  run-bios   - Run in QEMU with legacy BIOS (Multiboot test)"
-	@echo "  iso        - Create bootable ISO (not implemented)"
-	@echo "  help       - Show this help"
+	@echo "  iso        - Create bootable ISO (not yet implemented)"
+	@echo ""
+	@echo "Quick Start:"
+	@echo "  make test  - Build and test in one command!"
 	@echo ""
 	@echo "Requirements:"
-	@echo "  - GCC/Clang with x86_64 target"
-	@echo "  - NASM assembler"
-	@echo "  - QEMU for testing"
-	@echo "  - OVMF UEFI firmware for UEFI testing"
+	@echo "  Build:  GCC, Clang, GNU Binutils (as, ld, objcopy)"
+	@echo "  Test:   qemu-system-x86 (install: apt install qemu-system-x86)"
+	@echo "  UEFI:   OVMF firmware (optional, for full UEFI boot)"
+	@echo ""
+	@echo "Project Status:"
+	@echo "  ✅ UEFI Bootloader (boot_simple.c)"
+	@echo "  ✅ Kernel Entry (entry.S)"
+	@echo "  ✅ VGA Console (console.c)"
+	@echo "  ✅ GDT (Global Descriptor Table)"
+	@echo "  ✅ IDT (Interrupt Descriptor Table)"
+	@echo "  ✅ PIC (8259 Interrupt Controller)"
+	@echo "  ⏳ PMM (Physical Memory Manager)"
+	@echo "  ⏳ VMM (Virtual Memory Manager)"
