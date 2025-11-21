@@ -70,7 +70,9 @@ BOOT_OBJS = $(BUILD_DIR)/boot.o
 KERNEL_OBJS = $(BUILD_DIR)/multiboot.o \
               $(BUILD_DIR)/entry.o \
               $(BUILD_DIR)/main.o \
-              $(BUILD_DIR)/console.o
+              $(BUILD_DIR)/console.o \
+              $(BUILD_DIR)/idt.o \
+              $(BUILD_DIR)/idt_asm.o
 
 # Default target
 .PHONY: all
@@ -122,6 +124,14 @@ $(BUILD_DIR)/main.o: $(KERNEL_DIR)/main.c $(KERNEL_DIR)/types.h $(KERNEL_DIR)/bo
 $(BUILD_DIR)/console.o: $(KERNEL_DIR)/console.c $(KERNEL_DIR)/console.h $(KERNEL_DIR)/types.h | $(BUILD_DIR)
 	@echo "[CC] Compiling console..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/idt.o: $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/idt.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/io.h | $(BUILD_DIR)
+	@echo "[CC] Compiling IDT..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/idt_asm.o: $(KERNEL_DIR)/idt_asm.S | $(BUILD_DIR)
+	@echo "[AS] Assembling IDT stubs..."
+	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
 
 # Create kernel linker script
 $(KERNEL_DIR)/linker.ld:

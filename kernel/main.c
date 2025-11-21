@@ -8,6 +8,7 @@
 #include "types.h"
 #include "boot.h"
 #include "console.h"
+#include "idt.h"
 
 // Forward declarations
 static void print_memory_map(boot_info_t *info);
@@ -85,8 +86,9 @@ void kernel_main(boot_info_t *boot_info) {
     // TODO: Initialize GDT
     console_print("  [ ] GDT (Global Descriptor Table)\n");
 
-    // TODO: Initialize IDT
-    console_print("  [ ] IDT (Interrupt Descriptor Table)\n");
+    // Initialize IDT
+    idt_init();
+    console_print("  [OK] IDT (Interrupt Descriptor Table)\n");
 
     // TODO: Initialize physical memory manager
     console_print("  [ ] PMM (Physical Memory Manager)\n");

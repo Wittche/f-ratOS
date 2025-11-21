@@ -543,6 +543,104 @@ Boot protocols and CPU modes must match:
 
 ---
 
+### [2025-11-21] ESP Image Creation Failed - mkfs.fat Not Installed (AuroraOS)
+**Phase**: Phase 2 - Testing and deployment setup
+**Component**: scripts/create_esp.sh - FAT32 filesystem creation
+**Description**: When attempting to create the ESP (EFI System Partition) image for testing, the script failed at the FAT32 formatting step with mkfs.fat missing error.
+
+**Error**:
+```
+[INFO] Creating ESP image (64 MB)...
+[INFO] Formatting as FAT32...
+[ERROR] Failed to format ESP image as FAT32
+```
+
+**Root Cause**:
+The `mkfs.fat` utility (part of `dosfstools` package) is not installed on the system. This tool is required to format the ESP image as FAT32, which is mandatory for UEFI bootable partitions.
+
+**Investigation**:
+```bash
+$ which mkfs.fat mkfs.vfat
+# Returns: exit code 1 (not found)
+```
+
+**Solution Options**:
+
+**Option 1: Install dosfstools (Recommended for real testing)**
+```bash
+# Debian/Ubuntu
+sudo apt-get install dosfstools
+
+# Fedora/RHEL
+sudo dnf install dosfstools
+
+# Arch Linux
+sudo pacman -S dosfstools
+```
+
+**Option 2: Continue with kernel development (Current approach)**
+Since OVMF is also not available on this system, focus on kernel feature development instead:
+- Implement IDT (Interrupt Descriptor Table)
+- Implement GDT (Global Descriptor Table) setup
+- Add exception handlers
+- Add IRQ handlers
+- Implement PMM (Physical Memory Manager)
+
+**Option 3: Use QEMU with kernel directly (Limited testing)**
+Test kernel with direct kernel boot (requires Multiboot 2 or 32-bit bootstrap)
+
+**Current Decision**:
+✅ **Continue with kernel development** - implement core features (IDT, GDT, interrupts)
+⏸️ **Defer ESP testing** - can test later when dosfstools/OVMF are available
+📝 **Document for deployment** - update README with dosfstools requirement
+
+**Status**:
+- ❌ Cannot create ESP image without mkfs.fat
+- ❌ Cannot test with UEFI boot flow yet
+- ✅ Can continue developing kernel features
+- ✅ Bootloader code is complete and ready
+- ➡️ **Focus on kernel feature implementation**
+
+**Prevention**:
+- **Document all system dependencies** in README.md with installation commands
+- **Add dependency check** at beginning of create_esp.sh script:
+  ```bash
+  if ! command -v mkfs.fat >/dev/null 2>&1; then
+      error "mkfs.fat not found. Install: sudo apt-get install dosfstools"
+  fi
+  ```
+- **CI/CD integration** - ensure build systems have required tools
+- **Provide alternative paths** - allow development without full boot testing
+
+**Commit**: (pending)
+
+**Key Lesson**:
+OS development has multiple parallel paths:
+1. **Bootloader development** ✅ (Complete - boot_simple.c)
+2. **Kernel development** 🔄 (In progress - console, entry done)
+3. **Testing infrastructure** ❌ (Blocked - needs dosfstools/OVMF)
+
+**You can progress on paths 1 and 2 even when path 3 is blocked.**
+
+**Next Steps**:
+1. Implement IDT for interrupt handling
+2. Implement GDT setup
+3. Add exception handlers (divide by zero, page fault, etc.)
+4. Add keyboard IRQ handler
+5. Later: Test with UEFI boot when tools available
+
+**Related Dependencies**:
+- `dosfstools` - FAT filesystem utilities (mkfs.fat, fsck.fat)
+- `OVMF` - Open Virtual Machine Firmware (UEFI firmware for QEMU)
+- `qemu-system-x86_64` - QEMU x86_64 emulator ✅ (already installed)
+
+**References**:
+- dosfstools: https://github.com/dosfstools/dosfstools
+- OVMF: https://github.com/tianocore/edk2
+- UEFI Specification: https://uefi.org/specifications
+
+---
+
 ## Tips and Lessons Learned
 
 ### General
