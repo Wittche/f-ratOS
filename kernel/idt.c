@@ -8,6 +8,7 @@
 #include "console.h"
 #include "io.h"
 #include "timer.h"
+#include "keyboard.h"
 
 // IDT entries and pointer
 static idt_entry_t idt[IDT_ENTRIES];
@@ -245,9 +246,8 @@ void irq_handler(interrupt_frame_t *frame) {
             break;
 
         case IRQ_KEYBOARD:
-            // Keyboard interrupt
-            console_print("[IRQ] Keyboard interrupt received\n");
-            // TODO: Read scancode from port 0x60
+            // Keyboard interrupt - call keyboard handler
+            keyboard_irq_handler();
             break;
 
         default:

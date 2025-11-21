@@ -14,6 +14,7 @@
 #include "vmm.h"
 #include "kheap.h"
 #include "timer.h"
+#include "keyboard.h"
 
 // Forward declarations
 static void print_memory_map(boot_info_t *info);
@@ -111,6 +112,10 @@ void kernel_main(boot_info_t *boot_info) {
     // Initialize Timer (PIT)
     timer_init(TIMER_FREQ_1000HZ);  // 1000 Hz = 1ms tick
     console_print("  [OK] Timer (PIT)\n");
+
+    // Initialize Keyboard (PS/2)
+    keyboard_init();
+    console_print("  [OK] Keyboard (PS/2)\n");
 
     // TODO: Initialize Mach layer
     console_print("  [ ] Mach Microkernel Layer\n");
