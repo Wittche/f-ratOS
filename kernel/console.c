@@ -1,15 +1,21 @@
 /**
  * AuroraOS Kernel - Console Implementation
  * Simple text console for early kernel output
+ * Outputs to both VGA text mode and serial port (COM1)
  */
 
 #include "console.h"
 #include "types.h"
+#include "serial.h"
 
 // VGA text mode constants
 #define VGA_WIDTH  80
 #define VGA_HEIGHT 25
 #define VGA_MEMORY 0xB8000
+
+// Serial port configuration
+#define CONSOLE_SERIAL_PORT SERIAL_COM1
+#define CONSOLE_BAUD_DIVISOR 1  // 115200 baud
 
 // Console state
 static struct {
@@ -56,6 +62,10 @@ static inline uint16_t vga_entry(unsigned char uc, uint8_t color) {
 void console_init(void *framebuffer, uint32_t width, uint32_t height, uint32_t pitch) {
     (void)pitch;  // Unused for now, suppress warning
 
+    // Initialize serial port first for early debug output
+    serial_init(CONSOLE_SERIAL_PORT, CONSOLE_BAUD_DIVISOR);
+    serial_write_string(CONSOLE_SERIAL_PORT, "\r\n=== AuroraOS Serial Console ===\r\n");
+
     if (framebuffer && width > 0 && height > 0) {
         // Framebuffer mode (not implemented yet)
         console.buffer = (uint16_t*)framebuffer;
@@ -81,6 +91,8 @@ void console_init(void *framebuffer, uint32_t width, uint32_t height, uint32_t p
         vga[1] = vga_entry('K', console.color);
         vga[2] = vga_entry('!', console.color);
     }
+
+    serial_write_string(CONSOLE_SERIAL_PORT, "Console initialized\r\n");
 }
 
 // Clear console
@@ -129,6 +141,9 @@ static void console_putchar_at(char c, uint8_t color, uint32_t x, uint32_t y) {
 
 // Put character and advance cursor
 static void console_putchar(char c) {
+    // Always write to serial port (works even if VGA buffer is not available)
+    serial_write_byte(CONSOLE_SERIAL_PORT, c);
+
     if (!console.buffer) return;
 
     if (c == '\n') {

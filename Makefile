@@ -76,6 +76,7 @@ KERNEL_OBJS = $(BUILD_DIR)/multiboot.o \
               $(BUILD_DIR)/entry.o \
               $(BUILD_DIR)/main.o \
               $(BUILD_DIR)/console.o \
+              $(BUILD_DIR)/serial.o \
               $(BUILD_DIR)/gdt.o \
               $(BUILD_DIR)/gdt_asm.o \
               $(BUILD_DIR)/idt.o \
@@ -142,8 +143,12 @@ $(BUILD_DIR)/main.o: $(KERNEL_DIR)/main.c $(KERNEL_DIR)/types.h $(KERNEL_DIR)/bo
 	@echo "[CC] Compiling kernel main..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
-$(BUILD_DIR)/console.o: $(KERNEL_DIR)/console.c $(KERNEL_DIR)/console.h $(KERNEL_DIR)/types.h | $(BUILD_DIR)
+$(BUILD_DIR)/console.o: $(KERNEL_DIR)/console.c $(KERNEL_DIR)/console.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/serial.h | $(BUILD_DIR)
 	@echo "[CC] Compiling console..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/serial.o: $(KERNEL_DIR)/serial.c $(KERNEL_DIR)/serial.h | $(BUILD_DIR)
+	@echo "[CC] Compiling serial port driver..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
 $(BUILD_DIR)/gdt.o: $(KERNEL_DIR)/gdt.c $(KERNEL_DIR)/gdt.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
