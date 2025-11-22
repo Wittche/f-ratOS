@@ -64,9 +64,13 @@ void pmm_init(boot_info_t *boot_info) {
     serial_debug_str("bitmap_already_init\n");
 
     serial_debug_str("clearing_pmm_state\n");
+    serial_debug_str("set_total_pages\n");
     pmm_state.total_pages = 0;
+    serial_debug_str("set_free_pages\n");
     pmm_state.free_pages = 0;
+    serial_debug_str("set_used_pages\n");
     pmm_state.used_pages = 0;
+    serial_debug_str("set_highest_page\n");
     pmm_state.highest_page = 0;
     serial_debug_str("after_pmm_state\n");
 
