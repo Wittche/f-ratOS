@@ -329,6 +329,14 @@ void vmm_init(boot_info_t *boot_info) {
     uint64_t pd_phys = (uint64_t)&static_pd;
     serial_debug_str("got_all_addrs\n");
 
+    // DEBUG: Check if addresses are within 1GB range (must be < 0x40000000)
+    serial_debug_str("pml4_addr=");
+    for (int shift = 28; shift >= 0; shift -= 4) {
+        int nibble = (pml4_phys >> shift) & 0xF;
+        serial_debug_char(nibble < 10 ? '0' + nibble : 'A' + nibble - 10);
+    }
+    serial_debug_str("\n");
+
     // CRITICAL: Zero out static page tables to avoid garbage entries!
     // .bss is NOT cleared by entry.S, so we must do it manually
     serial_debug_str("zero_pml4\n");
