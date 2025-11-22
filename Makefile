@@ -252,10 +252,11 @@ $(KERNEL_DIR)/linker.ld:
 	@echo "    }" >> $@
 	@echo "}" >> $@
 
-# Create bootable ISO (future)
+# Create bootable ISO with GRUB
 .PHONY: iso
-iso: $(BOOTLOADER_EFI) $(KERNEL_BIN)
-	@echo "ISO creation not yet implemented"
+iso: $(KERNEL_ELF)
+	@echo "Creating bootable ISO with GRUB..."
+	@bash scripts/create_iso.sh
 
 # Create ESP (EFI System Partition) image
 .PHONY: esp
@@ -274,11 +275,21 @@ run: esp
 		-m 256M \
 		-serial stdio
 
+# Run with QEMU using ISO (recommended)
+.PHONY: run-iso
+run-iso: iso
+	@echo "Running AuroraOS from ISO in QEMU..."
+	qemu-system-x86_64 \
+		-cdrom $(ISO_IMAGE) \
+		-m 256M \
+		-serial stdio
+
 # Run with QEMU (use ELF format - simpler for testing)
+# Note: Newer QEMU versions may not support this without PVH headers
 .PHONY: run-bios
 run-bios: $(KERNEL_ELF)
 	@echo "Running kernel in QEMU (direct ELF load for testing)..."
-	@echo "Note: This is a basic test - kernel expects boot_info but gets multiboot info"
+	@echo "Note: This may fail on newer QEMU versions"
 	qemu-system-x86_64 \
 		-kernel $(KERNEL_ELF) \
 		-m 256M \
@@ -326,13 +337,14 @@ help:
 	@echo "  clean      - Remove all build artifacts"
 	@echo ""
 	@echo "Test Targets:"
-	@echo "  test       - Build everything and run quick test (recommended)"
-	@echo "  run-bios   - Run kernel with legacy Multiboot (simple test)"
+	@echo "  test       - Build everything and run quick test"
+	@echo "  run-iso    - Run kernel from ISO with GRUB (recommended)"
 	@echo "  run        - Run with UEFI bootloader (requires OVMF)"
+	@echo "  run-bios   - Run kernel directly (may fail on newer QEMU)"
 	@echo ""
 	@echo "Advanced Targets:"
+	@echo "  iso        - Create bootable ISO with GRUB2"
 	@echo "  esp        - Create ESP (EFI System Partition) image"
-	@echo "  iso        - Create bootable ISO (not yet implemented)"
 	@echo ""
 	@echo "Quick Start:"
 	@echo "  make test  - Build and test in one command!"
