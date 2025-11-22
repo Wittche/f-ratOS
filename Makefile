@@ -295,26 +295,34 @@ run-bios: $(KERNEL_ELF)
 		-m 256M \
 		-serial stdio
 
-# Quick test - Build and run in one command
+# Quick test - Build and run in one command (RECOMMENDED)
 .PHONY: test
-test: all
+test: run-iso
+
+# Super quick - Clean, build, and run everything
+.PHONY: quick
+quick: clean test
+
+# Alternative test with curses display
+.PHONY: test-gui
+test-gui: iso
 	@echo ""
 	@echo "=========================================="
 	@echo "  Quick Test - Running AuroraOS Kernel"
 	@echo "=========================================="
 	@echo ""
 	@echo "Build Summary:"
-	@echo "  Bootloader: $$(ls -lh $(BOOTLOADER_EFI) | awk '{print $$5}')"
-	@echo "  Kernel:     $$(ls -lh $(KERNEL_BIN) | awk '{print $$5}')"
+	@echo "  Kernel:     $$(ls -lh $(KERNEL_ELF) | awk '{print $$5}')"
+	@echo "  ISO:        $$(ls -lh $(ISO_IMAGE) | awk '{print $$5}')"
 	@echo ""
-	@echo "Starting QEMU..."
+	@echo "Starting QEMU with GUI..."
 	@echo "Press Ctrl+C to exit"
 	@echo ""
 	@qemu-system-x86_64 \
-		-kernel $(KERNEL_ELF) \
+		-cdrom $(ISO_IMAGE) \
 		-m 256M \
 		-serial stdio \
-		-display curses \
+		-display gtk \
 		2>&1 || (echo ""; echo "ERROR: QEMU not found!"; echo "Install: sudo apt-get install qemu-system-x86"; false)
 
 # Clean build artifacts
@@ -347,7 +355,8 @@ help:
 	@echo "  esp        - Create ESP (EFI System Partition) image"
 	@echo ""
 	@echo "Quick Start:"
-	@echo "  make test  - Build and test in one command!"
+	@echo "  make test  - Build and run (fastest)"
+	@echo "  make quick - Clean, build, and run (safest)"
 	@echo ""
 	@echo "Requirements:"
 	@echo "  Build:  GCC, Clang, GNU Binutils (as, ld, objcopy)"
