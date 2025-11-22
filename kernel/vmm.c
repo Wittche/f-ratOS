@@ -320,7 +320,7 @@ void vmm_init(boot_info_t *boot_info) {
     // identity mapping, but PMM-allocated page tables need identity mapping to be accessed!
 
     serial_debug_str("get_static_addrs\n");
-    // Get physical addresses of static buffers (they're in kernel .bss, already zeroed)
+    // Get physical addresses of static buffers
     serial_debug_str("addr_pml4\n");
     uint64_t pml4_phys = (uint64_t)&static_pml4;
     serial_debug_str("addr_pdpt\n");
@@ -329,9 +329,26 @@ void vmm_init(boot_info_t *boot_info) {
     uint64_t pd_phys = (uint64_t)&static_pd;
     serial_debug_str("got_all_addrs\n");
 
-    // Build identity mapping manually for first 16MB (0x0 - 0xFFFFFF)
+    // CRITICAL: Zero out static page tables to avoid garbage entries!
+    // .bss is NOT cleared by entry.S, so we must do it manually
+    serial_debug_str("zero_pml4\n");
+    for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+        static_pml4.entries[i] = 0;
+    }
+    serial_debug_str("zero_pdpt\n");
+    for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+        static_pdpt.entries[i] = 0;
+    }
+    serial_debug_str("zero_pd\n");
+    for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+        static_pd.entries[i] = 0;
+    }
+    serial_debug_str("zero_done\n");
+
+    // Build identity mapping manually for first 1GB (0x0 - 0x3FFFFFFF)
     // Using 2MB HUGE PAGES to avoid PT arrays and 4096-iteration loops!
-    // Structure: PML4[0] -> PDPT[0] -> PD[0-7] (each PD entry = 2MB huge page)
+    // Structure: PML4[0] -> PDPT[0] -> PD[0-511] (each PD entry = 2MB huge page)
+    // This matches entry.S boot mapping to avoid breaking anything!
 
     // PML4[0] -> PDPT
     serial_debug_str("before_pml4_write\n");
@@ -343,13 +360,17 @@ void vmm_init(boot_info_t *boot_info) {
     static_pdpt.entries[0] = pte_create(pd_phys, PTE_PRESENT | PTE_WRITE);
     serial_debug_str("after_pdpt_write\n");
 
-    // PD[0-7] = 2MB huge pages (0-16MB)
+    // PD[0-511] = 2MB huge pages (0-1GB total)
     // Each PD entry points directly to a 2MB physical region (no PT needed!)
     serial_debug_str("before_pd_loop\n");
-    for (int i = 0; i < 8; i++) {
-        serial_debug_char('0' + i);  // Print loop index: 0,1,2,3,4,5,6,7
-        uint64_t phys_addr = i * 2 * 1024 * 1024;  // 0MB, 2MB, 4MB, ..., 14MB
+    for (int i = 0; i < 512; i++) {
+        uint64_t phys_addr = i * 2 * 1024 * 1024;  // 0MB, 2MB, 4MB, ..., 1022MB
         static_pd.entries[i] = pte_create(phys_addr, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
+
+        // Progress indicator every 64 entries (128MB)
+        if (i % 64 == 0) {
+            serial_debug_char('.');
+        }
     }
     serial_debug_str("\nafter_pd_loop\n");
 
@@ -361,7 +382,7 @@ void vmm_init(boot_info_t *boot_info) {
     serial_debug_str("set_state3\n");
     vmm_state.page_tables_allocated = 3; // PML4 + PDPT + PD (no PTs!)
     serial_debug_str("set_state4\n");
-    vmm_state.kernel_pages = 4096; // 16MB = 4096 pages
+    vmm_state.kernel_pages = 512 * 512; // 1GB = 262144 pages
     serial_debug_str("set_state5\n");
     vmm_initialized = true;
     serial_debug_str("state_complete\n");
@@ -371,7 +392,7 @@ void vmm_init(boot_info_t *boot_info) {
     vmm_load_cr3(pml4_phys);
     serial_debug_str("after_cr3_load\n");
 
-    console_print("[VMM] Identity mapping active (16MB)\n");
+    console_print("[VMM] Identity mapping active (1GB)\n");
 
     // PHASE 2: Now we can use vmm_map_range for additional mappings
     // since identity mapping is active and PMM allocations are accessible
