@@ -6,12 +6,26 @@
 
 #include "pmm.h"
 #include "console.h"
+#include "io.h"
+
+// Serial debug helper (COM1 = 0x3F8)
+static inline void serial_debug_char(char c) {
+    outb(0x3F8, c);
+}
+
+static inline void serial_debug_str(const char *s) {
+    while (*s) {
+        serial_debug_char(*s++);
+    }
+}
 
 // Bitmap to track page allocation (1 = allocated, 0 = free)
 // Each bit represents one 4KB page
 // 1MB bitmap = supports up to 32GB RAM (1MB * 8 bits * 4KB)
 #define BITMAP_SIZE (1024 * 1024)  // 1MB
-static uint8_t page_bitmap[BITMAP_SIZE];
+// Initialize all pages as allocated (0xFF) at compile time to avoid runtime loop
+// Using GCC designated initializer extension
+static uint8_t page_bitmap[BITMAP_SIZE] = {[0 ... (BITMAP_SIZE-1)] = 0xFF};
 
 // PMM state
 static struct {
@@ -41,41 +55,60 @@ static inline bool bitmap_test(uint64_t bit) {
  * Initialize PMM with boot memory map
  */
 void pmm_init(boot_info_t *boot_info) {
+    serial_debug_str("pmm_init_start\n");
     console_print("[PMM] Initializing Physical Memory Manager...\n");
+    serial_debug_str("after_pmm_console_print\n");
 
-    // Clear bitmap (all pages initially marked as allocated)
-    for (uint64_t i = 0; i < BITMAP_SIZE; i++) {
-        page_bitmap[i] = 0xFF;
-    }
+    // Bitmap already initialized to 0xFF at compile time
+    // No need for runtime clearing loop
+    serial_debug_str("bitmap_already_init\n");
 
+    serial_debug_str("clearing_pmm_state\n");
+    serial_debug_str("set_total_pages\n");
     pmm_state.total_pages = 0;
+    serial_debug_str("set_free_pages\n");
     pmm_state.free_pages = 0;
+    serial_debug_str("set_used_pages\n");
     pmm_state.used_pages = 0;
+    serial_debug_str("set_highest_page\n");
     pmm_state.highest_page = 0;
+    serial_debug_str("after_pmm_state\n");
 
     // Check if we have boot info
+    serial_debug_str("checking_boot_info\n");
     if (!boot_info || !boot_info->memory_map || boot_info->memory_map_size == 0) {
+        serial_debug_str("boot_info_null_path\n");
         console_print("[PMM] WARNING: No memory map available\n");
+        serial_debug_str("after_warning\n");
         console_print("[PMM] Using default 16MB memory assumption\n");
+        serial_debug_str("after_default_msg\n");
 
         // Default: Mark first 16MB as available (except first 1MB)
+        serial_debug_str("calc_default_pages\n");
         uint64_t default_pages = (16 * 1024 * 1024) / PAGE_SIZE;  // 16MB = 4096 pages
         uint64_t reserved_pages = (1 * 1024 * 1024) / PAGE_SIZE;  // First 1MB reserved
 
+        serial_debug_str("set_total_pages\n");
         pmm_state.total_pages = default_pages;
         pmm_state.highest_page = default_pages;
 
         // Mark pages 256-4095 as free (1MB-16MB)
+        serial_debug_str("before_mark_free\n");
         for (uint64_t i = reserved_pages; i < default_pages; i++) {
             bitmap_clear(i);
             pmm_state.free_pages++;
         }
+        serial_debug_str("after_mark_free\n");
 
+        serial_debug_str("calc_used_pages\n");
         pmm_state.used_pages = pmm_state.total_pages - pmm_state.free_pages;
         pmm_state.initialized = true;
 
+        serial_debug_str("before_init_msg\n");
         console_print("[PMM] Initialized with default memory layout\n");
+        serial_debug_str("before_print_stats\n");
         pmm_print_stats();
+        serial_debug_str("pmm_init_done\n");
         return;
     }
 
@@ -188,40 +221,61 @@ void pmm_init(boot_info_t *boot_info) {
  * Allocate a single physical page frame
  */
 uint64_t pmm_alloc_frame(void) {
-    console_print("[DEBUG] pmm_alloc_frame: Entry\n");
+    serial_debug_str("alloc_frame_entry\n");
 
     if (!pmm_state.initialized) {
+        serial_debug_str("alloc_frame_not_init\n");
         console_print("[DEBUG] PMM not initialized!\n");
         return 0;
     }
+    serial_debug_str("alloc_frame_init_ok\n");
 
     if (pmm_state.free_pages == 0) {
+        serial_debug_str("alloc_frame_oom\n");
         console_print("[DEBUG] PMM: Out of memory!\n");
         return 0;  // Out of memory
     }
+    serial_debug_str("alloc_frame_has_free\n");
 
-    console_print("[DEBUG] PMM: Searching for free page...\n");
-
+    serial_debug_str("before_search_loop\n");
     // Find first free page (first-fit)
     for (uint64_t page = 0; page < pmm_state.highest_page; page++) {
         if (!bitmap_test(page)) {
+            serial_debug_str("found_free_page\n");
+            serial_debug_str("before_console_print_page\n");
             console_print("[DEBUG] PMM: Found free page ");
+            serial_debug_str("after_console_print_page\n");
+            serial_debug_str("before_console_print_dec\n");
             console_print_dec(page);
+            serial_debug_str("after_console_print_dec\n");
             console_print("\n");
+            serial_debug_str("after_console_newline\n");
 
+            serial_debug_str("before_bitmap_set\n");
             bitmap_set(page);
+            serial_debug_str("after_bitmap_set\n");
+            serial_debug_str("before_free_decr\n");
             pmm_state.free_pages--;
+            serial_debug_str("after_free_decr\n");
+            serial_debug_str("before_used_incr\n");
             pmm_state.used_pages++;
+            serial_debug_str("after_used_incr\n");
 
+            serial_debug_str("before_page_to_addr\n");
             uint64_t addr = PAGE_TO_ADDR(page);
+            serial_debug_str("after_page_to_addr\n");
+            serial_debug_str("before_returning_msg\n");
             console_print("[DEBUG] PMM: Returning address ");
             console_print_hex(addr);
             console_print("\n");
+            serial_debug_str("returning_address\n");
 
             return addr;
         }
     }
+    serial_debug_str("after_search_loop\n");
 
+    serial_debug_str("no_free_pages\n");
     console_print("[DEBUG] PMM: No free pages found!\n");
     return 0;  // No free pages found
 }
