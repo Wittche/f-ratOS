@@ -188,24 +188,41 @@ void pmm_init(boot_info_t *boot_info) {
  * Allocate a single physical page frame
  */
 uint64_t pmm_alloc_frame(void) {
+    console_print("[DEBUG] pmm_alloc_frame: Entry\n");
+
     if (!pmm_state.initialized) {
+        console_print("[DEBUG] PMM not initialized!\n");
         return 0;
     }
 
     if (pmm_state.free_pages == 0) {
+        console_print("[DEBUG] PMM: Out of memory!\n");
         return 0;  // Out of memory
     }
+
+    console_print("[DEBUG] PMM: Searching for free page...\n");
 
     // Find first free page (first-fit)
     for (uint64_t page = 0; page < pmm_state.highest_page; page++) {
         if (!bitmap_test(page)) {
+            console_print("[DEBUG] PMM: Found free page ");
+            console_print_dec(page);
+            console_print("\n");
+
             bitmap_set(page);
             pmm_state.free_pages--;
             pmm_state.used_pages++;
-            return PAGE_TO_ADDR(page);
+
+            uint64_t addr = PAGE_TO_ADDR(page);
+            console_print("[DEBUG] PMM: Returning address ");
+            console_print_hex(addr);
+            console_print("\n");
+
+            return addr;
         }
     }
 
+    console_print("[DEBUG] PMM: No free pages found!\n");
     return 0;  // No free pages found
 }
 
