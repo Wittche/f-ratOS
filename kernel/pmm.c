@@ -254,11 +254,16 @@ uint64_t pmm_alloc_frame(void) {
             serial_debug_str("before_bitmap_set\n");
             bitmap_set(page);
             serial_debug_str("after_bitmap_set\n");
+            serial_debug_str("before_free_decr\n");
             pmm_state.free_pages--;
+            serial_debug_str("after_free_decr\n");
+            serial_debug_str("before_used_incr\n");
             pmm_state.used_pages++;
-            serial_debug_str("after_state_update\n");
+            serial_debug_str("after_used_incr\n");
 
+            serial_debug_str("before_page_to_addr\n");
             uint64_t addr = PAGE_TO_ADDR(page);
+            serial_debug_str("after_page_to_addr\n");
             serial_debug_str("before_returning_msg\n");
             console_print("[DEBUG] PMM: Returning address ");
             console_print_hex(addr);
