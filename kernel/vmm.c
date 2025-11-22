@@ -394,13 +394,14 @@ void vmm_init(boot_info_t *boot_info) {
     serial_debug_str("init_flag_msg_skipped\n");
     serial_debug_str("after_init_flag_msg\n");
 
-    // Identity map first 1MB (for VGA, BIOS, bootloader compatibility)
-    // REDUCED from 4MB to prevent stack overflow during page table allocation
+    // Identity map first 16MB (all available physical memory)
+    // This allows page tables allocated by PMM to be accessible
+    // since PMM can allocate from anywhere in physical memory
     serial_debug_str("before_identity_map_msg\n");
     serial_debug_str("identity_map_msg_skipped\n");
     serial_debug_str("after_identity_map_msg\n");
     serial_debug_str("before_vmm_map_range_call\n");
-    if (!vmm_map_range(0x0, 0x0, 1 * 1024 * 1024, PTE_KERNEL_FLAGS)) {
+    if (!vmm_map_range(0x0, 0x0, 16 * 1024 * 1024, PTE_KERNEL_FLAGS)) {
         serial_debug_str("identity_map_failed\n");
         console_print("[VMM] ERROR: Failed to identity map\n");
         return;
@@ -408,7 +409,7 @@ void vmm_init(boot_info_t *boot_info) {
     serial_debug_str("after_vmm_map_range_call\n");
     serial_debug_str("identity_complete_msg_skipped\n");
     serial_debug_str("after_identity_complete_msg\n");
-    vmm_state.kernel_pages += 256; // 1MB = 256 pages
+    vmm_state.kernel_pages += 4096; // 16MB = 4096 pages
     serial_debug_str("after_kernel_pages_update\n");
 
     // Map kernel to higher-half (if boot_info available)
