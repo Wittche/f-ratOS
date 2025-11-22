@@ -359,14 +359,22 @@ void vmm_init(boot_info_t *boot_info) {
     serial_debug_str("\nafter_pd_loop\n");
 
     // Set up VMM state
+    serial_debug_str("set_state1\n");
     kernel_pml4 = &static_pml4;
+    serial_debug_str("set_state2\n");
     vmm_state.pml4_physical = pml4_phys;
+    serial_debug_str("set_state3\n");
     vmm_state.page_tables_allocated = 3; // PML4 + PDPT + PD (no PTs!)
+    serial_debug_str("set_state4\n");
     vmm_state.kernel_pages = 4096; // 16MB = 4096 pages
+    serial_debug_str("set_state5\n");
     vmm_initialized = true;
+    serial_debug_str("state_complete\n");
 
     // Load the new page tables (activate identity mapping)
+    serial_debug_str("before_cr3_load\n");
     vmm_load_cr3(pml4_phys);
+    serial_debug_str("after_cr3_load\n");
 
     console_print("[VMM] Identity mapping active (16MB)\n");
 
