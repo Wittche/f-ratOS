@@ -70,22 +70,32 @@ void kernel_main(boot_info_t *boot_info) {
     console_print("=====================================\n\n");
     serial_debug_str("banner_done\n");
 
+    serial_debug_str("before_validate_msg\n");
     // Validate boot info
     console_print("[BOOT] Validating boot information...\n");
+    serial_debug_str("after_validate_msg\n");
 
     // Check if we have valid boot info
+    serial_debug_str("declaring_has_boot_info\n");
     bool has_boot_info = false;
+    serial_debug_str("checking_boot_info_null\n");
     if (!boot_info) {
+        serial_debug_str("boot_info_is_null\n");
         console_print("[WARNING] Boot info is NULL\n");
+        serial_debug_str("after_null_warning\n");
         console_print("[INFO] Running in TEST MODE (no bootloader)\n");
+        serial_debug_str("after_test_mode_msg\n");
     } else if (boot_info->magic != AURORA_BOOT_MAGIC) {
+        serial_debug_str("invalid_boot_magic\n");
         console_print("[WARNING] Invalid boot magic: ");
         console_print_hex(boot_info->magic);
         console_print("\n[INFO] Running in TEST MODE\n");
     } else {
+        serial_debug_str("boot_info_valid\n");
         console_print("[OK] Boot info validated\n");
         has_boot_info = true;
     }
+    serial_debug_str("after_boot_info_check\n");
 
     // Print boot information if available
     if (has_boot_info) {
@@ -120,26 +130,38 @@ void kernel_main(boot_info_t *boot_info) {
     }
 
     // Initialize kernel subsystems
+    serial_debug_str("before_init_subsystems_msg\n");
     console_print("\n[KERNEL] Initializing subsystems...\n");
+    serial_debug_str("after_init_subsystems_msg\n");
 
     // Initialize GDT (must be done before IDT and TSS)
+    serial_debug_str("before_gdt_init\n");
     gdt_init();
+    serial_debug_str("after_gdt_init\n");
     console_print("  [OK] GDT (Global Descriptor Table)\n");
 
     // Initialize TSS (must be done after GDT)
+    serial_debug_str("before_tss_init\n");
     tss_init();
+    serial_debug_str("after_tss_init\n");
     console_print("  [OK] TSS (Task State Segment)\n");
 
     // Initialize IDT
+    serial_debug_str("before_idt_init\n");
     idt_init();
+    serial_debug_str("after_idt_init\n");
     console_print("  [OK] IDT (Interrupt Descriptor Table)\n");
 
     // Initialize Physical Memory Manager
+    serial_debug_str("before_pmm_init\n");
     pmm_init(boot_info);
+    serial_debug_str("after_pmm_init\n");
     console_print("  [OK] PMM (Physical Memory Manager)\n");
 
     // Initialize Virtual Memory Manager
+    serial_debug_str("before_vmm_init\n");
     vmm_init(boot_info);
+    serial_debug_str("after_vmm_init\n");
     console_print("  [OK] VMM (Virtual Memory Manager)\n");
 
     // Initialize Kernel Heap
