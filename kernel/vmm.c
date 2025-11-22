@@ -206,11 +206,49 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
     } else {
         // Check if this is a huge page (2MB)
         if (*pd_entry & PTE_HUGE) {
-            // Cannot get PTE for huge page - would need to split it first
-            console_print("[DEBUG] vmm_get_pte: Cannot access huge page, would need to split\n");
-            return NULL;
+            serial_debug_str("huge_page_detected\n");
+            // Split the huge page into 512 regular 4KB pages
+            // This is necessary when we need fine-grained mapping control
+
+            if (!create) {
+                serial_debug_str("huge_nocreate\n");
+                return NULL;  // Can't split without create permission
+            }
+
+            serial_debug_str("splitting_huge\n");
+
+            // Get the base physical address of the huge page
+            uint64_t huge_phys_base = pte_get_addr(*pd_entry);
+            uint64_t huge_flags = *pd_entry & PTE_FLAGS_MASK;
+
+            // Allocate new PT
+            uint64_t pt_phys = pmm_alloc_frame();
+            if (pt_phys == 0) {
+                serial_debug_str("split_alloc_fail\n");
+                return NULL;
+            }
+
+            pt = (page_table_t*)pt_phys;
+
+            // Populate PT with 512 entries, each mapping a 4KB chunk of the huge page
+            for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+                uint64_t page_phys = huge_phys_base + (i * PAGE_SIZE);
+                // Preserve flags but remove HUGE bit
+                uint64_t page_flags = (huge_flags & ~PTE_HUGE) | PTE_PRESENT | PTE_WRITE;
+                pt->entries[i] = pte_create(page_phys, page_flags);
+            }
+
+            // Replace huge page entry with PT pointer
+            *pd_entry = pte_create(pt_phys, PTE_KERNEL_FLAGS);
+            vmm_state.page_tables_allocated++;
+
+            // Flush TLB to ensure CPU sees the new page table structure
+            vmm_flush_tlb();
+
+            serial_debug_str("split_done\n");
+        } else {
+            pt = (page_table_t*)pte_get_addr(*pd_entry);
         }
-        pt = (page_table_t*)pte_get_addr(*pd_entry);
     }
 
     // Return pointer to final PT entry
@@ -230,11 +268,14 @@ bool vmm_map_page(uint64_t virt_addr, uint64_t phys_addr, uint64_t flags) {
     virt_addr = ALIGN_DOWN(virt_addr, PAGE_SIZE);
     phys_addr = ALIGN_DOWN(phys_addr, PAGE_SIZE);
 
+    serial_debug_str("get_pte\n");
     // Get or create PTE
     pte_t *pte = vmm_get_pte(virt_addr, true);
     if (!pte) {
+        serial_debug_str("pte_null\n");
         return false;
     }
+    serial_debug_str("pte_ok\n");
 
     // Check if already mapped
     if (*pte & PTE_PRESENT) {
@@ -247,7 +288,9 @@ bool vmm_map_page(uint64_t virt_addr, uint64_t phys_addr, uint64_t flags) {
     }
 
     // Flush TLB for this page
+    serial_debug_str("flush\n");
     vmm_flush_tlb_single(virt_addr);
+    serial_debug_str("flush_ok\n");
 
     return true;
 }
