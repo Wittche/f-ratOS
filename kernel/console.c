@@ -175,6 +175,11 @@ static void console_putchar(char c) {
 void console_print(const char *str) {
     if (!str) return;
 
+    // TEMPORARY WORKAROUND: Disable all console output
+    // console_print() causes kernel hang after long loops
+    // Use serial debug instead
+    return;
+
     while (*str) {
         console_putchar(*str++);
     }
@@ -211,6 +216,10 @@ void console_print_hex(uint64_t num) {
 
 // Print decimal number
 void console_print_dec(uint64_t num) {
+    // TEMPORARY WORKAROUND: Disable console output
+    (void)num;  // Suppress unused parameter warning
+    return;
+
     char buffer[32];
     int i = 0;
 

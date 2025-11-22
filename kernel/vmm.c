@@ -368,13 +368,16 @@ void vmm_init(boot_info_t *boot_info) {
 
     // DEBUG: After zeroing
     serial_debug_str("before_zeroed_msg\n");
-    console_print("[DEBUG] PML4 zeroed successfully\n");
+    // SKIP: console_print("[DEBUG] PML4 zeroed successfully\n");  // Causes hang
+    serial_debug_str("PML4_zeroed_successfully\n");
     serial_debug_str("after_zeroed_msg\n");
 
     serial_debug_str("before_pml4_print\n");
-    console_print("[VMM] PML4 allocated at ");
-    console_print_hex(pml4_phys);
-    console_print("\n");
+    // SKIP console_print to avoid hang
+    // console_print("[VMM] PML4 allocated at ");
+    // console_print_hex(pml4_phys);
+    // console_print("\n");
+    serial_debug_str("pml4_print_skipped\n");
     serial_debug_str("after_pml4_print\n");
 
     serial_debug_str("before_vmm_init_flag\n");
