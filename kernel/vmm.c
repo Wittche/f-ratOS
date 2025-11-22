@@ -326,9 +326,13 @@ void vmm_init(boot_info_t *boot_info) {
 
     serial_debug_str("get_static_addrs\n");
     // Get physical addresses of static buffers (they're in kernel .bss, already zeroed)
+    serial_debug_str("addr_pml4\n");
     uint64_t pml4_phys = (uint64_t)&static_pml4;
+    serial_debug_str("addr_pdpt\n");
     uint64_t pdpt_phys = (uint64_t)&static_pdpt;
+    serial_debug_str("addr_pd\n");
     uint64_t pd_phys = (uint64_t)&static_pd;
+    serial_debug_str("got_all_addrs\n");
 
     // Build identity mapping manually for first 16MB (0x0 - 0xFFFFFF)
     // Using 2MB HUGE PAGES to avoid PT arrays and 4096-iteration loops!
