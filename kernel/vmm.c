@@ -341,7 +341,9 @@ void vmm_init(boot_info_t *boot_info) {
     serial_debug_str("F\n");
     serial_debug_str("vmm_state_ready\n");
 
+    serial_debug_str("BEFORE_CONSOLE_PRINT\n");
     console_print("[VMM] Using boot page tables (1GB identity mapping)\n");
+    serial_debug_str("AFTER_CONSOLE_PRINT\n");
 
     // PHASE 2: Now we can use vmm_map_range for additional mappings
     // since identity mapping is active and PMM allocations are accessible

@@ -162,7 +162,9 @@ void kernel_main(boot_info_t *boot_info) {
     serial_debug_str("before_vmm_init\n");
     vmm_init(boot_info);
     serial_debug_str("after_vmm_init\n");
+    serial_debug_str("BEFORE_VMM_OK_MSG\n");
     console_print("  [OK] VMM (Virtual Memory Manager)\n");
+    serial_debug_str("AFTER_VMM_OK_MSG\n");
 
     // Initialize Kernel Heap
     kheap_init(boot_info);
