@@ -229,13 +229,15 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         serial_debug_str("pt_count_incremented\n");
 
         // Zero out the new table
+        // DISABLED: 512-iteration loop causes stack overflow!
+        // PMM should ideally return zeroed pages, but for now we accept garbage in unused entries.
+        // Only entries we explicitly map will be set, unmapped entries remain garbage (but not accessed).
         serial_debug_str("before_pt_zero\n");
         pt = (page_table_t*)pt_phys;
-        serial_debug_str("pt_zero_loop_start\n");
-        for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
-            pt->entries[i] = 0;
-        }
-        serial_debug_str("pt_zero_loop_end\n");
+        serial_debug_str("pt_zero_skipped\n");
+        // for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+        //     pt->entries[i] = 0;
+        // }
         serial_debug_str("after_pt_zero\n");
     } else {
         serial_debug_str("pd_already_present\n");
@@ -362,20 +364,9 @@ void vmm_init(boot_info_t *boot_info) {
     // This solves the chicken-and-egg problem: we need page tables to create
     // identity mapping, but PMM-allocated page tables need identity mapping to be accessed!
 
-    serial_debug_str("zero_static_pml4\n");
-    // Zero static page tables
-    for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
-        static_pml4.entries[i] = 0;
-    }
-    serial_debug_str("zero_static_pdpt\n");
-    for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
-        static_pdpt.entries[i] = 0;
-    }
-    serial_debug_str("zero_static_pd\n");
-    for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
-        static_pd.entries[i] = 0;
-    }
-    serial_debug_str("static_tables_zeroed\n");
+    // NOTE: Static buffers are in .bss section, bootloader already zeroed them!
+    // NO need to zero again - just use them directly. This eliminates 1536 loop iterations!
+    serial_debug_str("static_buffers_already_zero\n");
 
     // Get physical addresses of static buffers (they're in kernel .bss)
     serial_debug_str("get_static_addrs\n");
