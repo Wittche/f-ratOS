@@ -11,12 +11,31 @@
 .section .text
 .code32
 
+/* Serial port debug macro - writes one character to COM1 */
+.macro SERIAL_DEBUG char
+    pushl %eax
+    pushl %edx
+    movl $0x3F8, %edx      /* COM1 port */
+    movb $\char, %al
+    outb %al, %dx
+    popl %edx
+    popl %eax
+.endm
+
 .global _start
 .extern kernel_main
 
 _start:
     /* Disable interrupts */
     cli
+
+    /* DEBUG: Serial + VGA output */
+    SERIAL_DEBUG 'S'       /* S = Start */
+    SERIAL_DEBUG 'T'
+    SERIAL_DEBUG 'A'
+    SERIAL_DEBUG 'R'
+    SERIAL_DEBUG 'T'
+    SERIAL_DEBUG '\n'
 
     /* DEBUG: Write 'A' to VGA (we reached _start) */
     movl $0xB8000, %edi
@@ -27,6 +46,8 @@ _start:
     /* Use absolute addressing - load address to register first */
     movl $multiboot_info_ptr, %edi
     movl %ebx, (%edi)
+
+    SERIAL_DEBUG 'B'       /* B = multiboot info saved */
 
     /* DEBUG: Write 'B' to VGA (saved multiboot info) */
     movl $0xB8000, %edi
@@ -41,6 +62,8 @@ _start:
     pushl $0
     popf
 
+    SERIAL_DEBUG 'C'       /* C = stack setup */
+
     /* DEBUG: Write 'C' to VGA (about to check long mode) */
     movl $0xB8000, %edi
     movb $'C', 4(%edi)
@@ -51,6 +74,8 @@ _start:
     testl %eax, %eax
     jz .no_long_mode
 
+    SERIAL_DEBUG 'D'       /* D = long mode supported */
+
     /* DEBUG: Write 'D' to VGA (long mode supported) */
     movl $0xB8000, %edi
     movb $'D', 6(%edi)
@@ -58,6 +83,8 @@ _start:
 
     /* Setup paging for long mode */
     call setup_page_tables
+
+    SERIAL_DEBUG 'E'       /* E = page tables setup */
 
     /* DEBUG: Write 'E' to VGA (page tables setup) */
     movl $0xB8000, %edi
@@ -79,6 +106,8 @@ _start:
     orl $0x100, %eax      /* Set LM bit */
     wrmsr
 
+    SERIAL_DEBUG 'F'       /* F = about to enable paging */
+
     /* DEBUG: Write 'F' to VGA (about to enable paging) */
     movl $0xB8000, %edi
     movb $'F', 10(%edi)
@@ -88,6 +117,8 @@ _start:
     movl %cr0, %eax
     orl $0x80000001, %eax /* Set PG and PE bits */
     movl %eax, %cr0
+
+    SERIAL_DEBUG 'G'       /* G = paging enabled! */
 
     /* DEBUG: Write 'G' to VGA (paging enabled) */
     movl $0xB8000, %edi
@@ -99,10 +130,17 @@ _start:
     movl $gdt64_pointer, %eax
     lgdt (%eax)
 
+    SERIAL_DEBUG 'H'       /* H = GDT loaded */
+
     /* DEBUG: Write 'H' to VGA (GDT loaded) */
     movl $0xB8000, %edi
     movb $'H', 14(%edi)
     movb $0x0F, 15(%edi)
+
+    SERIAL_DEBUG 'J'       /* J = about to jump to 64-bit */
+    SERIAL_DEBUG 'M'
+    SERIAL_DEBUG 'P'
+    SERIAL_DEBUG '\n'
 
     /* Jump to 64-bit code */
     /* Manual far jump encoding to avoid assembler issues */
@@ -112,6 +150,11 @@ _start:
     .word 0x08
 
 .no_long_mode:
+    SERIAL_DEBUG 'E'       /* E = ERROR: no long mode */
+    SERIAL_DEBUG 'R'
+    SERIAL_DEBUG 'R'
+    SERIAL_DEBUG '!'
+    SERIAL_DEBUG '\n'
     /* Halt if no long mode support */
     cli
     hlt
@@ -186,7 +229,26 @@ setup_page_tables:
 
 /* 64-bit code */
 .code64
+
+/* Serial port debug macro for 64-bit mode */
+.macro SERIAL_DEBUG64 char
+    pushq %rax
+    pushq %rdx
+    movq $0x3F8, %rdx      /* COM1 port */
+    movb $\char, %al
+    outb %al, %dx
+    popq %rdx
+    popq %rax
+.endm
+
 long_mode_start:
+    SERIAL_DEBUG64 '6'     /* 6 = 64-bit mode! */
+    SERIAL_DEBUG64 '4'
+    SERIAL_DEBUG64 'B'
+    SERIAL_DEBUG64 'I'
+    SERIAL_DEBUG64 'T'
+    SERIAL_DEBUG64 '\n'
+
     /* DEBUG: Write 'I' to VGA (in 64-bit mode!) */
     movq $0xB8000, %rdi
     movb $'I', 16(%rdi)
@@ -200,6 +262,8 @@ long_mode_start:
     movw %ax, %gs
     movw %ax, %ss
 
+    SERIAL_DEBUG64 'J'     /* J = segments loaded */
+
     /* DEBUG: Write 'J' to VGA (segments loaded) */
     movq $0xB8000, %rdi
     movb $'J', 18(%rdi)
@@ -208,6 +272,8 @@ long_mode_start:
     /* Setup 64-bit stack */
     movq $stack_top, %rsp
     xorq %rbp, %rbp
+
+    SERIAL_DEBUG64 'K'     /* K = stack ready */
 
     /* DEBUG: Write 'K' to VGA (stack ready) */
     movq $0xB8000, %rdi
@@ -218,11 +284,19 @@ long_mode_start:
     /* RDI = boot_info pointer (NULL for now, we'll parse Multiboot2 later) */
     xorq %rdi, %rdi
 
+    SERIAL_DEBUG64 'L'     /* L = calling kernel_main */
+
     /* DEBUG: Write 'L' to VGA (calling kernel_main) */
     movq $0xB8000, %rdi
     movb $'L', 22(%rdi)
     movb $0x0F, 23(%rdi)
     xorq %rdi, %rdi  /* restore RDI */
+
+    SERIAL_DEBUG64 'M'     /* M = about to call */
+    SERIAL_DEBUG64 'A'
+    SERIAL_DEBUG64 'I'
+    SERIAL_DEBUG64 'N'
+    SERIAL_DEBUG64 '\n'
 
     /* Call kernel main */
     call kernel_main
