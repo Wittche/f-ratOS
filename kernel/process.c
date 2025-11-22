@@ -287,7 +287,19 @@ void process_exit(int exit_code) {
             t = t->next;
         }
     }
-    // Scheduler will clean up
+
+    // If scheduler is running, yield to another thread
+    // Otherwise, just halt the CPU
+    if (scheduler_is_running()) {
+        scheduler_yield();
+        // Should never return, but just in case...
+    }
+
+    // Halt the CPU - we're done
+    console_print("[PROC] Process exited, halting...\n");
+    while (1) {
+        __asm__ __volatile__("cli; hlt");
+    }
 }
 
 /**
