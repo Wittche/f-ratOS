@@ -8,9 +8,21 @@
 #include "console.h"
 #include "gdt.h"
 #include "types.h"
+#include "io.h"
 
 // Global TSS (one per CPU, we only have one CPU for now)
 static tss_t kernel_tss;
+
+// Serial debug helper (COM1 = 0x3F8)
+static inline void serial_debug_char(char c) {
+    outb(0x3F8, c);
+}
+
+static inline void serial_debug_str(const char *s) {
+    while (*s) {
+        serial_debug_char(*s++);
+    }
+}
 
 /**
  * Load TSS into Task Register
@@ -28,49 +40,66 @@ static inline void tss_load(uint16_t selector) {
  *   Bytes 8-15: Extended descriptor (base high)
  */
 static void tss_set_gdt_entry(uint32_t num, uint64_t base, uint32_t limit) {
+    serial_debug_str("set_gdt_entry_start\n");
     // TSS descriptor is at GDT entry 'num'
     // We need to manually set it because it's a system descriptor (16 bytes)
 
     extern gdt_entry_t gdt[];  // Defined in gdt.c
 
+    serial_debug_str("set_limit_low\n");
     // First 8 bytes (standard descriptor format)
     gdt[num].limit_low = limit & 0xFFFF;
+    serial_debug_str("set_base_low\n");
     gdt[num].base_low = base & 0xFFFF;
+    serial_debug_str("set_base_mid\n");
     gdt[num].base_mid = (base >> 16) & 0xFF;
 
+    serial_debug_str("set_access\n");
     // Access byte: Present, DPL=0, Type=0x9 (Available 64-bit TSS)
     gdt[num].access = 0x89;
 
+    serial_debug_str("set_granularity\n");
     // Granularity: limit high bits + flags
     gdt[num].granularity = ((limit >> 16) & 0x0F) | 0x00;  // No granularity flag
 
+    serial_debug_str("set_base_high\n");
     gdt[num].base_high = (base >> 24) & 0xFF;
 
+    serial_debug_str("set_extended\n");
     // Second 8 bytes (upper 32 bits of base address)
     // We need to access the next GDT entry as raw bytes
     uint64_t *gdt_extended = (uint64_t*)&gdt[num + 1];
+    serial_debug_str("write_extended\n");
     *gdt_extended = base >> 32;  // Upper 32 bits of base
+    serial_debug_str("set_gdt_entry_done\n");
 }
 
 /**
  * Initialize TSS
  */
 void tss_init(void) {
+    serial_debug_str("tss_init_start\n");
     console_print("[TSS] Initializing Task State Segment...\n");
+    serial_debug_str("after_tss_console_print\n");
 
     // Clear TSS structure
+    serial_debug_str("before_tss_clear\n");
     for (uint32_t i = 0; i < sizeof(tss_t); i++) {
         ((uint8_t*)&kernel_tss)[i] = 0;
     }
+    serial_debug_str("after_tss_clear\n");
 
     // Set I/O map base to end of TSS (no I/O bitmap)
+    serial_debug_str("setting_iomap\n");
     kernel_tss.iomap_base = sizeof(tss_t);
 
     // RSP0 will be set when creating threads
     // For now, set it to NULL (will be updated per-thread)
+    serial_debug_str("setting_rsp0\n");
     kernel_tss.rsp0 = 0;
 
     // IST entries are NULL for now (no special interrupt stacks)
+    serial_debug_str("setting_ist\n");
     kernel_tss.ist1 = 0;
     kernel_tss.ist2 = 0;
     kernel_tss.ist3 = 0;
@@ -78,18 +107,24 @@ void tss_init(void) {
     kernel_tss.ist5 = 0;
     kernel_tss.ist6 = 0;
     kernel_tss.ist7 = 0;
+    serial_debug_str("after_ist\n");
 
     // Add TSS descriptor to GDT
     // TSS takes 2 GDT entries (16 bytes) in 64-bit mode
     // We'll use entries 6 and 7 (0x30 and 0x38)
+    serial_debug_str("calc_tss_base\n");
     uint64_t tss_base = (uint64_t)&kernel_tss;
     uint32_t tss_limit = sizeof(tss_t) - 1;
+    serial_debug_str("before_set_gdt_entry\n");
 
     tss_set_gdt_entry(6, tss_base, tss_limit);
+    serial_debug_str("after_set_gdt_entry\n");
 
     // Load TSS into Task Register
     // Selector = 6 * 8 = 0x30
+    serial_debug_str("before_tss_load\n");
     tss_load(0x30);
+    serial_debug_str("after_tss_load\n");
 
     console_print("[TSS] Initialized and loaded\n");
     console_print("[TSS]   Base: ");
@@ -97,6 +132,7 @@ void tss_init(void) {
     console_print("\n[TSS]   Limit: ");
     console_print_hex(tss_limit);
     console_print("\n[TSS]   Selector: 0x30\n");
+    serial_debug_str("tss_init_complete\n");
 }
 
 /**
