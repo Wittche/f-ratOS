@@ -106,10 +106,10 @@ check_long_mode:
 
 /* Setup page tables for identity mapping */
 setup_page_tables:
-    /* Clear page tables */
+    /* Clear page tables - clear 12KB (3 tables * 4KB each) */
     movl $pml4_table, %edi
     movl $0, %eax
-    movl $4096, %ecx
+    movl $3072, %ecx      /* 12KB / 4 bytes per stosl = 3072 */
     rep stosl
 
     /* Setup PML4: PML4[0] -> PDPT */
@@ -169,8 +169,8 @@ long_mode_start:
 .align 16
 gdt64:
     .quad 0x0000000000000000    /* Null descriptor */
-    .quad 0x00AF9A000000FFFF    /* Code segment (64-bit) */
-    .quad 0x00AF92000000FFFF    /* Data segment (64-bit) */
+    .quad 0x00209A0000000000    /* Code segment: 64-bit, present, ring 0, executable, readable */
+    .quad 0x0000920000000000    /* Data segment: 64-bit, present, ring 0, writable */
 gdt64_end:
 
 gdt64_pointer:
