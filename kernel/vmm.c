@@ -410,11 +410,16 @@ void vmm_init(boot_info_t *boot_info) {
     static_pd.entries[7] = pte_create(7 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
     serial_debug_str("huge_pages_setup\n");
 
-    // Set up VMM state
+    // Set up VMM state - debug each assignment
+    serial_debug_str("set_kernel_pml4\n");
     kernel_pml4 = &static_pml4;
+    serial_debug_str("set_pml4_phys\n");
     vmm_state.pml4_physical = pml4_phys;
+    serial_debug_str("set_page_tables_allocated\n");
     vmm_state.page_tables_allocated = 3; // PML4 + PDPT + PD (no PTs!)
+    serial_debug_str("set_kernel_pages\n");
     vmm_state.kernel_pages = 4096; // 16MB = 4096 pages
+    serial_debug_str("set_vmm_initialized\n");
     vmm_initialized = true;
     serial_debug_str("vmm_state_initialized\n");
 
