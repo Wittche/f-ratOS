@@ -189,8 +189,14 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
 
         // Allocate new PT
         serial_debug_str("alloc_pt\n");
+        serial_debug_str("before_pt_pmm_call\n");
         uint64_t pt_phys = pmm_alloc_frame();
-        if (pt_phys == 0) return NULL;
+        serial_debug_str("after_pt_pmm_call\n");
+        if (pt_phys == 0) {
+            serial_debug_str("pt_alloc_failed\n");
+            return NULL;
+        }
+        serial_debug_str("pt_alloc_success\n");
 
         *pd_entry = pte_create(pt_phys, PTE_KERNEL_FLAGS);
         vmm_state.page_tables_allocated++;
