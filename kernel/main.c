@@ -21,12 +21,24 @@
 #include "kthread_test.h"
 #include "tss.h"
 #include "usermode.h"
+#include "io.h"
 
 // User mode test program (defined in usermode_test.c)
 extern void usermode_test_program(void);
 
 // Forward declarations
 static void print_memory_map(boot_info_t *info);
+
+// Serial debug helper (COM1 = 0x3F8)
+static inline void serial_debug_char(char c) {
+    outb(0x3F8, c);
+}
+
+static inline void serial_debug_str(const char *s) {
+    while (*s) {
+        serial_debug_char(*s++);
+    }
+}
 
 /**
  * Kernel Main Entry Point
@@ -35,16 +47,28 @@ static void print_memory_map(boot_info_t *info);
  * @param boot_info Pointer to boot information structure
  */
 void kernel_main(boot_info_t *boot_info) {
+    serial_debug_str("kmain_entered\n");
+
     // Initialize early console (VGA text mode fallback)
     // TODO: Use framebuffer if available
+    serial_debug_str("before_console_init\n");
     console_init(NULL, 80, 25, 0);
-    console_clear();
+    serial_debug_str("after_console_init\n");
 
+    serial_debug_str("before_console_clear\n");
+    console_clear();
+    serial_debug_str("after_console_clear\n");
+
+    serial_debug_str("before_banner\n");
     // Print banner
     console_print("=====================================\n");
+    serial_debug_str("banner_line1\n");
     console_print("      AuroraOS Kernel v0.1\n");
+    serial_debug_str("banner_line2\n");
     console_print("  Hybrid Kernel - XNU Inspired\n");
+    serial_debug_str("banner_line3\n");
     console_print("=====================================\n\n");
+    serial_debug_str("banner_done\n");
 
     // Validate boot info
     console_print("[BOOT] Validating boot information...\n");
