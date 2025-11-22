@@ -240,11 +240,26 @@ uint64_t pmm_alloc_frame(void) {
     for (uint64_t page = 0; page < pmm_state.highest_page; page++) {
         if (!bitmap_test(page)) {
             serial_debug_str("pmm_found\n");
-            bitmap_set(page);
+
+            // Expand bitmap_set inline with debug messages
+            serial_debug_str("bset\n");
+            uint64_t byte_index = page / 8;
+            serial_debug_str("b1\n");
+            uint64_t bit_index = page % 8;
+            serial_debug_str("b2\n");
+            uint8_t bit_mask = (1 << bit_index);
+            serial_debug_str("b3\n");
+            page_bitmap[byte_index] |= bit_mask;
+            serial_debug_str("b4\n");
+
+            serial_debug_str("dec\n");
             pmm_state.free_pages--;
+            serial_debug_str("inc\n");
             pmm_state.used_pages++;
+            serial_debug_str("calc\n");
+            uint64_t addr = PAGE_TO_ADDR(page);
             serial_debug_str("pmm_return\n");
-            return PAGE_TO_ADDR(page);
+            return addr;
         }
     }
     serial_debug_str("pmm_endloop\n");
