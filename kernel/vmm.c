@@ -9,6 +9,18 @@
 #include "console.h"
 #include "types.h"
 #include "boot.h"
+#include "io.h"
+
+// Serial debug helper (COM1 = 0x3F8)
+static inline void serial_debug_char(char c) {
+    outb(0x3F8, c);
+}
+
+static inline void serial_debug_str(const char *s) {
+    while (*s) {
+        serial_debug_char(*s++);
+    }
+}
 
 // Global page table pointers
 static page_table_t *kernel_pml4 = NULL;
@@ -108,6 +120,7 @@ void vmm_flush_tlb_single(uint64_t virt_addr) {
  */
 pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
     if (!vmm_initialized) {
+        serial_debug_str("get_pte_not_init\n");
         console_print("[DEBUG] vmm_get_pte: VMM not initialized!\n");
         return NULL;
     }
@@ -122,6 +135,7 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         if (!create) return NULL;
 
         // Allocate new PDPT
+        serial_debug_str("alloc_pdpt\n");
         console_print("[DEBUG] Allocating new PDPT...\n");
         uint64_t pdpt_phys = pmm_alloc_frame();
         console_print("[DEBUG] PDPT allocated at: ");
@@ -133,10 +147,12 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         vmm_state.page_tables_allocated++;
 
         // Zero out the new table
+        serial_debug_str("before_pdpt_zero\n");
         pdpt = (page_table_t*)pdpt_phys;
         for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
             pdpt->entries[i] = 0;
         }
+        serial_debug_str("after_pdpt_zero\n");
     } else {
         pdpt = (page_table_t*)pte_get_addr(*pml4_entry);
     }
@@ -149,6 +165,7 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         if (!create) return NULL;
 
         // Allocate new PD
+        serial_debug_str("alloc_pd\n");
         uint64_t pd_phys = pmm_alloc_frame();
         if (pd_phys == 0) return NULL;
 
@@ -156,10 +173,12 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         vmm_state.page_tables_allocated++;
 
         // Zero out the new table
+        serial_debug_str("before_pd_zero\n");
         pd = (page_table_t*)pd_phys;
         for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
             pd->entries[i] = 0;
         }
+        serial_debug_str("after_pd_zero\n");
     } else {
         pd = (page_table_t*)pte_get_addr(*pdpt_entry);
     }
@@ -172,6 +191,7 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         if (!create) return NULL;
 
         // Allocate new PT
+        serial_debug_str("alloc_pt\n");
         uint64_t pt_phys = pmm_alloc_frame();
         if (pt_phys == 0) return NULL;
 
@@ -179,10 +199,12 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         vmm_state.page_tables_allocated++;
 
         // Zero out the new table
+        serial_debug_str("before_pt_zero\n");
         pt = (page_table_t*)pt_phys;
         for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
             pt->entries[i] = 0;
         }
+        serial_debug_str("after_pt_zero\n");
     } else {
         pt = (page_table_t*)pte_get_addr(*pd_entry);
     }
@@ -299,63 +321,96 @@ bool vmm_unmap_range(uint64_t virt_addr, uint64_t size) {
  * Initialize Virtual Memory Manager
  */
 void vmm_init(boot_info_t *boot_info) {
+    serial_debug_str("vmm_init_start\n");
     console_print("[VMM] Initializing Virtual Memory Manager...\n");
+    serial_debug_str("after_vmm_console_print\n");
 
     // DEBUG: Before allocation
+    serial_debug_str("before_alloc_pml4_msg\n");
     console_print("[DEBUG] About to allocate PML4...\n");
+    serial_debug_str("after_alloc_pml4_msg\n");
 
     // Allocate PML4 (top-level page table)
+    serial_debug_str("calling_pmm_alloc_frame\n");
     uint64_t pml4_phys = pmm_alloc_frame();
+    serial_debug_str("after_pmm_alloc_frame\n");
 
     // DEBUG: After allocation
+    serial_debug_str("before_pmm_result_msg\n");
     console_print("[DEBUG] PMM returned: ");
     console_print_hex(pml4_phys);
     console_print("\n");
+    serial_debug_str("after_pmm_result_msg\n");
 
     if (pml4_phys == 0) {
+        serial_debug_str("pml4_alloc_failed\n");
         console_print("[VMM] ERROR: Failed to allocate PML4\n");
         return;
     }
 
+    serial_debug_str("before_pml4_setup\n");
     kernel_pml4 = (page_table_t*)pml4_phys;
     vmm_state.pml4_physical = pml4_phys;
     vmm_state.page_tables_allocated = 1;
+    serial_debug_str("after_pml4_setup\n");
 
     // DEBUG: Before zeroing
+    serial_debug_str("before_pml4_zero_msg\n");
     console_print("[DEBUG] About to zero out PML4...\n");
+    serial_debug_str("after_pml4_zero_msg\n");
 
     // Zero out PML4
+    serial_debug_str("before_pml4_zero_loop\n");
     for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
         kernel_pml4->entries[i] = 0;
     }
+    serial_debug_str("after_pml4_zero_loop\n");
 
     // DEBUG: After zeroing
+    serial_debug_str("before_zeroed_msg\n");
     console_print("[DEBUG] PML4 zeroed successfully\n");
+    serial_debug_str("after_zeroed_msg\n");
 
+    serial_debug_str("before_pml4_print\n");
     console_print("[VMM] PML4 allocated at ");
     console_print_hex(pml4_phys);
     console_print("\n");
+    serial_debug_str("after_pml4_print\n");
 
+    serial_debug_str("before_vmm_init_flag\n");
     vmm_initialized = true;
+    serial_debug_str("after_vmm_init_flag\n");
 
     // DEBUG: VMM initialized flag set
+    serial_debug_str("before_init_flag_msg\n");
     console_print("[DEBUG] vmm_initialized = true\n");
+    serial_debug_str("after_init_flag_msg\n");
 
     // Identity map first 4MB (for VGA, BIOS, bootloader compatibility)
+    serial_debug_str("before_identity_map_msg\n");
     console_print("[VMM] Identity mapping first 4MB...\n");
+    serial_debug_str("after_identity_map_msg\n");
+    serial_debug_str("before_vmm_map_range_call\n");
     if (!vmm_map_range(0x0, 0x0, 4 * 1024 * 1024, PTE_KERNEL_FLAGS)) {
+        serial_debug_str("identity_map_failed\n");
         console_print("[VMM] ERROR: Failed to identity map\n");
         return;
     }
+    serial_debug_str("after_vmm_map_range_call\n");
     console_print("[DEBUG] Identity mapping complete\n");
+    serial_debug_str("after_identity_complete_msg\n");
     vmm_state.kernel_pages += 1024; // 4MB = 1024 pages
+    serial_debug_str("after_kernel_pages_update\n");
 
     // Map kernel to higher-half (if boot_info available)
+    serial_debug_str("before_boot_info_check\n");
     if (boot_info && boot_info->magic == AURORA_BOOT_MAGIC) {
+        serial_debug_str("boot_info_valid\n");
         uint64_t kernel_size = boot_info->kernel_size;
         uint64_t kernel_phys = boot_info->kernel_physical_base;
         uint64_t kernel_virt = KERNEL_VIRTUAL_BASE;
 
+        serial_debug_str("before_kernel_map_msg\n");
         console_print("[VMM] Mapping kernel to higher-half...\n");
         console_print("[VMM]   Physical: ");
         console_print_hex(kernel_phys);
@@ -364,31 +419,46 @@ void vmm_init(boot_info_t *boot_info) {
         console_print("\n[VMM]   Size:     ");
         console_print_hex(kernel_size);
         console_print(" bytes\n");
+        serial_debug_str("after_kernel_map_msg\n");
 
+        serial_debug_str("before_kernel_map_range\n");
         if (!vmm_map_range(kernel_virt, kernel_phys, kernel_size, PTE_KERNEL_FLAGS)) {
+            serial_debug_str("kernel_map_failed\n");
             console_print("[VMM] ERROR: Failed to map kernel\n");
             return;
         }
+        serial_debug_str("after_kernel_map_range\n");
 
         uint64_t kernel_pages = (kernel_size + PAGE_SIZE - 1) / PAGE_SIZE;
         vmm_state.kernel_pages += kernel_pages;
+        serial_debug_str("kernel_map_complete\n");
     } else {
+        serial_debug_str("boot_info_invalid_test_mode\n");
         // Test mode: Map kernel at 1MB
         console_print("[VMM] Test mode: Identity mapping kernel at 1MB...\n");
         uint64_t kernel_size = 1024 * 1024; // Assume 1MB kernel
+        serial_debug_str("before_test_map_range\n");
         if (!vmm_map_range(KERNEL_PHYSICAL_BASE, KERNEL_PHYSICAL_BASE,
                           kernel_size, PTE_KERNEL_FLAGS)) {
+            serial_debug_str("test_map_failed\n");
             console_print("[VMM] ERROR: Failed to map kernel\n");
             return;
         }
+        serial_debug_str("after_test_map_range\n");
         vmm_state.kernel_pages += 256; // 1MB = 256 pages
     }
 
     // Setup recursive mapping (last PML4 entry points to itself)
+    serial_debug_str("before_recursive_map_msg\n");
     console_print("[VMM] Setting up recursive mapping...\n");
+    serial_debug_str("after_recursive_map_msg\n");
+    serial_debug_str("before_recursive_map_set\n");
     kernel_pml4->entries[RECURSIVE_SLOT] = pte_create(pml4_phys, PTE_KERNEL_FLAGS);
+    serial_debug_str("after_recursive_map_set\n");
 
+    serial_debug_str("before_vmm_complete_msg\n");
     console_print("[VMM] Initialization complete\n");
+    serial_debug_str("after_vmm_complete_msg\n");
     console_print("[VMM]   Page tables allocated: ");
     console_print_dec(vmm_state.page_tables_allocated);
     console_print("\n[VMM]   Pages mapped: ");
