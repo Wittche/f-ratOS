@@ -19,6 +19,13 @@ multiboot_header_start:
     .long MULTIBOOT2_HEADER_LENGTH
     .long MULTIBOOT2_CHECKSUM
 
+    /* Entry address tag - tell bootloader where to jump */
+    .align 8
+    .short 3    /* type = 3 (entry address) */
+    .short 0    /* flags */
+    .long 12    /* size */
+    .long 0x101000  /* entry_addr = _start symbol address */
+
     /* Information request tag (optional) */
     .align 8
     .short 1    /* type = 1 (information request) */
