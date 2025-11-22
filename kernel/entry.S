@@ -335,6 +335,9 @@ stack_top:
 
 /* Page tables (identity mapping for first 1GB) */
 .align 4096
+.global pml4_table
+.global pdp_table
+.global pd_table
 pml4_table:
     .space 4096
 pdp_table:
