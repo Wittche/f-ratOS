@@ -339,10 +339,14 @@ void vmm_init(boot_info_t *boot_info) {
     // Structure: PML4[0] -> PDPT[0] -> PD[0-7] (each PD entry = 2MB huge page)
 
     // PML4[0] -> PDPT
+    serial_debug_str("before_pml4_write\n");
     static_pml4.entries[0] = pte_create(pdpt_phys, PTE_PRESENT | PTE_WRITE);
+    serial_debug_str("after_pml4_write\n");
 
     // PDPT[0] -> PD
+    serial_debug_str("before_pdpt_write\n");
     static_pdpt.entries[0] = pte_create(pd_phys, PTE_PRESENT | PTE_WRITE);
+    serial_debug_str("after_pdpt_write\n");
 
     // PD[0-7] = 2MB huge pages (0-16MB)
     // Each PD entry points directly to a 2MB physical region (no PT needed!)
