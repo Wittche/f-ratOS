@@ -221,50 +221,27 @@ void pmm_init(boot_info_t *boot_info) {
  * Allocate a single physical page frame
  */
 uint64_t pmm_alloc_frame(void) {
-    serial_debug_str("pmm_enter\n");
-
     if (!pmm_state.initialized) {
-        serial_debug_str("pmm_not_init\n");
         console_print("[DEBUG] PMM not initialized!\n");
         return 0;
     }
 
     if (pmm_state.free_pages == 0) {
-        serial_debug_str("pmm_oom\n");
         console_print("[DEBUG] PMM: Out of memory!\n");
         return 0;  // Out of memory
     }
 
-    serial_debug_str("pmm_search\n");
     // Find first free page (first-fit)
     for (uint64_t page = 0; page < pmm_state.highest_page; page++) {
         if (!bitmap_test(page)) {
-            serial_debug_str("pmm_found\n");
-
-            // Expand bitmap_set inline with debug messages
-            serial_debug_str("bset\n");
-            uint64_t byte_index = page / 8;
-            serial_debug_str("b1\n");
-            uint64_t bit_index = page % 8;
-            serial_debug_str("b2\n");
-            uint8_t bit_mask = (1 << bit_index);
-            serial_debug_str("b3\n");
-            page_bitmap[byte_index] |= bit_mask;
-            serial_debug_str("b4\n");
-
-            serial_debug_str("dec\n");
+            // Found free page - mark as used
+            page_bitmap[page / 8] |= (1 << (page % 8));
             pmm_state.free_pages--;
-            serial_debug_str("inc\n");
             pmm_state.used_pages++;
-            serial_debug_str("calc\n");
-            uint64_t addr = PAGE_TO_ADDR(page);
-            serial_debug_str("pmm_return\n");
-            return addr;
+            return PAGE_TO_ADDR(page);
         }
     }
-    serial_debug_str("pmm_endloop\n");
 
-    serial_debug_str("pmm_none\n");
     console_print("[DEBUG] PMM: No free pages found!\n");
     return 0;  // No free pages found
 }
