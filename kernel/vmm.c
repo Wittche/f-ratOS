@@ -144,24 +144,14 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         if (!create) return NULL;
 
         // Allocate new PDPT
-        serial_debug_str("alloc_pdpt\n");
         uint64_t pdpt_phys = pmm_alloc_frame();
-        serial_debug_str("pdpt_allocated\n");
         if (pdpt_phys == 0) return NULL;
 
         *pml4_entry = pte_create(pdpt_phys, PTE_KERNEL_FLAGS);
         vmm_state.page_tables_allocated++;
 
-        // Zero out the new table
-        // DISABLED: Zeroing intermediate tables causes stack corruption
-        // Only PT (leaf tables) need zeroing, intermediate PDPT is okay with garbage
-        serial_debug_str("before_pdpt_zero\n");
+        // No need to zero - garbage in unused entries is safe (they're never accessed)
         pdpt = (page_table_t*)pdpt_phys;
-        serial_debug_str("pdpt_zero_skipped\n");
-        // for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
-        //     pdpt->entries[i] = 0;
-        // }
-        serial_debug_str("after_pdpt_zero\n");
     } else {
         pdpt = (page_table_t*)pte_get_addr(*pml4_entry);
     }
@@ -174,76 +164,47 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         if (!create) return NULL;
 
         // Allocate new PD
-        serial_debug_str("alloc_pd\n");
         uint64_t pd_phys = pmm_alloc_frame();
         if (pd_phys == 0) return NULL;
 
         *pdpt_entry = pte_create(pd_phys, PTE_KERNEL_FLAGS);
         vmm_state.page_tables_allocated++;
 
-        // Zero out the new table
-        // DISABLED: Zeroing intermediate tables causes stack corruption
-        // Only PT (leaf tables) need zeroing, intermediate PD is okay with garbage
-        serial_debug_str("before_pd_zero\n");
+        // No need to zero - garbage in unused entries is safe (they're never accessed)
         pd = (page_table_t*)pd_phys;
-        serial_debug_str("pd_zero_skipped\n");
-        // serial_debug_str("pd_zero_loop_start\n");
-        // for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
-        //     pd->entries[i] = 0;
-        // }
-        // serial_debug_str("pd_zero_loop_end\n");
-        serial_debug_str("after_pd_zero\n");
     } else {
         pd = (page_table_t*)pte_get_addr(*pdpt_entry);
     }
 
     // Walk PD
-    serial_debug_str("before_pd_walk\n");
     pte_t *pd_entry = &pd->entries[vaddr.pd_index];
-    serial_debug_str("after_pd_entry_get\n");
     page_table_t *pt;
 
-    serial_debug_str("checking_pd_present\n");
     if (!(*pd_entry & PTE_PRESENT)) {
-        serial_debug_str("pd_not_present\n");
         if (!create) {
-            serial_debug_str("create_false_return\n");
             return NULL;
         }
 
         // Allocate new PT
-        serial_debug_str("alloc_pt\n");
-        serial_debug_str("before_pt_pmm_call\n");
         uint64_t pt_phys = pmm_alloc_frame();
-        serial_debug_str("after_pt_pmm_call\n");
         if (pt_phys == 0) {
-            serial_debug_str("pt_alloc_failed\n");
             return NULL;
         }
-        serial_debug_str("pt_alloc_success\n");
 
-        serial_debug_str("before_pt_pte_create\n");
         *pd_entry = pte_create(pt_phys, PTE_KERNEL_FLAGS);
-        serial_debug_str("after_pt_pte_create\n");
         vmm_state.page_tables_allocated++;
-        serial_debug_str("pt_count_incremented\n");
 
         // Zero out the new table
         // DISABLED: 512-iteration loop causes stack overflow!
         // PMM should ideally return zeroed pages, but for now we accept garbage in unused entries.
         // Only entries we explicitly map will be set, unmapped entries remain garbage (but not accessed).
-        serial_debug_str("before_pt_zero\n");
         pt = (page_table_t*)pt_phys;
-        serial_debug_str("pt_zero_skipped\n");
         // for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
         //     pt->entries[i] = 0;
         // }
-        serial_debug_str("after_pt_zero\n");
     } else {
-        serial_debug_str("pd_already_present\n");
         pt = (page_table_t*)pte_get_addr(*pd_entry);
     }
-    serial_debug_str("pt_walk_complete\n");
 
     // Return pointer to final PT entry
     return &pt->entries[vaddr.pt_index];
@@ -357,76 +318,41 @@ bool vmm_unmap_range(uint64_t virt_addr, uint64_t size) {
  * Initialize Virtual Memory Manager
  */
 void vmm_init(boot_info_t *boot_info) {
-    serial_debug_str("vmm_init_start\n");
-    serial_debug_str("using_static_page_tables\n");
-
     // PHASE 1: Set up initial identity mapping using STATIC page table buffers
     // This solves the chicken-and-egg problem: we need page tables to create
     // identity mapping, but PMM-allocated page tables need identity mapping to be accessed!
 
-    // NOTE: Static buffers are in .bss section, bootloader already zeroed them!
-    // NO need to zero again - just use them directly. This eliminates 1536 loop iterations!
-    serial_debug_str("static_buffers_already_zero\n");
-
-    // Get physical addresses of static buffers (they're in kernel .bss)
-    serial_debug_str("get_static_addrs\n");
+    // Get physical addresses of static buffers (they're in kernel .bss, already zeroed)
     uint64_t pml4_phys = (uint64_t)&static_pml4;
     uint64_t pdpt_phys = (uint64_t)&static_pdpt;
     uint64_t pd_phys = (uint64_t)&static_pd;
-    serial_debug_str("got_static_addrs\n");
 
     // Build identity mapping manually for first 16MB (0x0 - 0xFFFFFF)
     // Using 2MB HUGE PAGES to avoid PT arrays and 4096-iteration loops!
     // Structure: PML4[0] -> PDPT[0] -> PD[0-7] (each PD entry = 2MB huge page)
 
     // PML4[0] -> PDPT
-    serial_debug_str("setup_pml4_entry\n");
     static_pml4.entries[0] = pte_create(pdpt_phys, PTE_PRESENT | PTE_WRITE);
 
     // PDPT[0] -> PD
-    serial_debug_str("setup_pdpt_entry\n");
     static_pdpt.entries[0] = pte_create(pd_phys, PTE_PRESENT | PTE_WRITE);
 
     // PD[0-7] = 2MB huge pages (0-16MB)
     // Each PD entry points directly to a 2MB physical region (no PT needed!)
-    serial_debug_str("setup_huge_pages\n");
+    for (int i = 0; i < 8; i++) {
+        uint64_t phys_addr = i * 2 * 1024 * 1024;  // 0MB, 2MB, 4MB, ..., 14MB
+        static_pd.entries[i] = pte_create(phys_addr, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
+    }
 
-    // Unroll loop manually to debug which write fails
-    serial_debug_str("hp0\n");
-    static_pd.entries[0] = pte_create(0 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
-    serial_debug_str("hp1\n");
-    static_pd.entries[1] = pte_create(1 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
-    serial_debug_str("hp2\n");
-    static_pd.entries[2] = pte_create(2 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
-    serial_debug_str("hp3\n");
-    static_pd.entries[3] = pte_create(3 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
-    serial_debug_str("hp4\n");
-    static_pd.entries[4] = pte_create(4 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
-    serial_debug_str("hp5\n");
-    static_pd.entries[5] = pte_create(5 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
-    serial_debug_str("hp6\n");
-    static_pd.entries[6] = pte_create(6 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
-    serial_debug_str("hp7\n");
-    static_pd.entries[7] = pte_create(7 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
-    serial_debug_str("huge_pages_setup\n");
-
-    // Set up VMM state - debug each assignment
-    serial_debug_str("set_kernel_pml4\n");
+    // Set up VMM state
     kernel_pml4 = &static_pml4;
-    serial_debug_str("set_pml4_phys\n");
     vmm_state.pml4_physical = pml4_phys;
-    serial_debug_str("set_page_tables_allocated\n");
     vmm_state.page_tables_allocated = 3; // PML4 + PDPT + PD (no PTs!)
-    serial_debug_str("set_kernel_pages\n");
     vmm_state.kernel_pages = 4096; // 16MB = 4096 pages
-    serial_debug_str("set_vmm_initialized\n");
     vmm_initialized = true;
-    serial_debug_str("vmm_state_initialized\n");
 
     // Load the new page tables (activate identity mapping)
-    serial_debug_str("loading_cr3\n");
     vmm_load_cr3(pml4_phys);
-    serial_debug_str("cr3_loaded\n");
 
     console_print("[VMM] Identity mapping active (16MB)\n");
 
