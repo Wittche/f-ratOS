@@ -403,15 +403,21 @@ void* krealloc(void *ptr, uint64_t new_size) {
  * Initialize kernel heap
  */
 void kheap_init(boot_info_t *boot_info) {
+    serial_debug_str("kheap_init_entered\n");
     console_print("[HEAP] Initializing kernel heap...\n");
+    serial_debug_str("after_console_print\n");
 
     // Set heap boundaries
+    serial_debug_str("setting_heap_boundaries\n");
     heap_state.heap_start = HEAP_START_ADDR;
     heap_state.heap_end = HEAP_START_ADDR;
     heap_state.heap_size = 0;
+    serial_debug_str("boundaries_set\n");
 
     // Expand initial heap
+    serial_debug_str("before_kheap_expand\n");
     kheap_expand(HEAP_INITIAL_SIZE);
+    serial_debug_str("after_kheap_expand\n");
 
     if (heap_state.heap_size == 0) {
         console_print("[HEAP] ERROR: Failed to initialize heap\n");
