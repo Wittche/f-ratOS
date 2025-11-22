@@ -428,8 +428,11 @@ void kheap_init(boot_info_t *boot_info) {
     serial_debug_str("after_init_msg\n");
 
     // Set heap boundaries
+    serial_debug_str("setting_heap_start\n");
     heap_state.heap_start = HEAP_START_ADDR;
+    serial_debug_str("setting_heap_end\n");
     heap_state.heap_end = HEAP_START_ADDR;
+    serial_debug_str("setting_heap_size\n");
     heap_state.heap_size = 0;
     serial_debug_str("heap_boundaries_set\n");
 
