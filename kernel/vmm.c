@@ -108,6 +108,7 @@ void vmm_flush_tlb_single(uint64_t virt_addr) {
  */
 pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
     if (!vmm_initialized) {
+        console_print("[DEBUG] vmm_get_pte: VMM not initialized!\n");
         return NULL;
     }
 
@@ -121,7 +122,11 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         if (!create) return NULL;
 
         // Allocate new PDPT
+        console_print("[DEBUG] Allocating new PDPT...\n");
         uint64_t pdpt_phys = pmm_alloc_frame();
+        console_print("[DEBUG] PDPT allocated at: ");
+        console_print_hex(pdpt_phys);
+        console_print("\n");
         if (pdpt_phys == 0) return NULL;
 
         *pml4_entry = pte_create(pdpt_phys, PTE_KERNEL_FLAGS);
@@ -296,8 +301,17 @@ bool vmm_unmap_range(uint64_t virt_addr, uint64_t size) {
 void vmm_init(boot_info_t *boot_info) {
     console_print("[VMM] Initializing Virtual Memory Manager...\n");
 
+    // DEBUG: Before allocation
+    console_print("[DEBUG] About to allocate PML4...\n");
+
     // Allocate PML4 (top-level page table)
     uint64_t pml4_phys = pmm_alloc_frame();
+
+    // DEBUG: After allocation
+    console_print("[DEBUG] PMM returned: ");
+    console_print_hex(pml4_phys);
+    console_print("\n");
+
     if (pml4_phys == 0) {
         console_print("[VMM] ERROR: Failed to allocate PML4\n");
         return;
@@ -307,10 +321,16 @@ void vmm_init(boot_info_t *boot_info) {
     vmm_state.pml4_physical = pml4_phys;
     vmm_state.page_tables_allocated = 1;
 
+    // DEBUG: Before zeroing
+    console_print("[DEBUG] About to zero out PML4...\n");
+
     // Zero out PML4
     for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
         kernel_pml4->entries[i] = 0;
     }
+
+    // DEBUG: After zeroing
+    console_print("[DEBUG] PML4 zeroed successfully\n");
 
     console_print("[VMM] PML4 allocated at ");
     console_print_hex(pml4_phys);
@@ -318,12 +338,16 @@ void vmm_init(boot_info_t *boot_info) {
 
     vmm_initialized = true;
 
+    // DEBUG: VMM initialized flag set
+    console_print("[DEBUG] vmm_initialized = true\n");
+
     // Identity map first 4MB (for VGA, BIOS, bootloader compatibility)
     console_print("[VMM] Identity mapping first 4MB...\n");
     if (!vmm_map_range(0x0, 0x0, 4 * 1024 * 1024, PTE_KERNEL_FLAGS)) {
         console_print("[VMM] ERROR: Failed to identity map\n");
         return;
     }
+    console_print("[DEBUG] Identity mapping complete\n");
     vmm_state.kernel_pages += 1024; // 4MB = 1024 pages
 
     // Map kernel to higher-half (if boot_info available)
