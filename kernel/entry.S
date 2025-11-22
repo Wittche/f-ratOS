@@ -1,21 +1,16 @@
-/**
- * AuroraOS Kernel Entry Point (GNU Assembler syntax)
- * Supports both UEFI and Multiboot2 boot
- *
- * Multiboot2 entry conditions:
+/* AuroraOS Kernel Entry Point */
+/* Called from GRUB Multiboot2 after loading kernel */
+/*
+ * Entry conditions:
  * - 32-bit protected mode
- * - EAX = 0x36d76289 (Multiboot2 magic)
- * - EBX = pointer to Multiboot2 information structure
- *
- * UEFI entry conditions:
- * - Long mode (64-bit) enabled
- * - RDI = pointer to boot_info structure
+ * - Paging disabled
+ * - EAX = Multiboot2 magic (0x36d76289)
+ * - EBX = Physical address of Multiboot2 info structure
  */
 
 .section .text
-
-/* 32-bit entry point for Multiboot2 */
 .code32
+
 .global _start
 .extern kernel_main
 
@@ -23,105 +18,182 @@ _start:
     /* Disable interrupts */
     cli
 
-    /* Check if we're already in 64-bit mode (UEFI boot) */
-    /* If coming from Multiboot2, we're in 32-bit mode */
+    /* Save Multiboot2 info */
+    movl %ebx, multiboot_info_ptr
 
-    /* Setup temporary GDT for 64-bit mode */
-    lgdt gdt64_pointer
+    /* Setup initial stack (16KB) */
+    movl $stack_top, %esp
+    movl $0, %ebp
+
+    /* Clear EFLAGS */
+    pushl $0
+    popf
+
+    /* Check for long mode support */
+    call check_long_mode
+    testl %eax, %eax
+    jz .no_long_mode
+
+    /* Setup paging for long mode */
+    call setup_page_tables
 
     /* Enable PAE (Physical Address Extension) */
-    mov %cr4, %eax
-    or $0x20, %eax
-    mov %eax, %cr4
+    movl %cr4, %eax
+    orl $0x20, %eax       /* Set PAE bit */
+    movl %eax, %cr4
 
-    /* Setup page tables for identity mapping */
-    /* PML4[0] -> PDPT */
-    mov $pdpt, %eax
-    or $0x3, %eax  /* Present + Writable */
-    mov %eax, pml4
-
-    /* PDPT[0] -> PD */
-    mov $pd, %eax
-    or $0x3, %eax
-    mov %eax, pdpt
-
-    /* PD[0] = 2MB page at 0x0 */
-    mov $0x83, %eax  /* Present + Writable + Huge Page */
-    mov %eax, pd
-
-    /* Load PML4 address into CR3 */
-    mov $pml4, %eax
-    mov %eax, %cr3
+    /* Load CR3 with PML4 address */
+    movl $pml4_table, %eax
+    movl %eax, %cr3
 
     /* Enable long mode in EFER MSR */
-    mov $0xC0000080, %ecx
+    movl $0xC0000080, %ecx
     rdmsr
-    or $0x100, %eax  /* Set LME bit */
+    orl $0x100, %eax      /* Set LM bit */
     wrmsr
 
-    /* Enable paging */
-    mov %cr0, %eax
-    or $0x80000000, %eax
-    mov %eax, %cr0
+    /* Enable paging and protected mode */
+    movl %cr0, %eax
+    orl $0x80000001, %eax /* Set PG and PE bits */
+    movl %eax, %cr0
 
-    /* Now in compatibility mode, jump to 64-bit code */
-    ljmp $0x08, $start64
+    /* Load 64-bit GDT */
+    lgdt (gdt64_pointer)
 
-/* 64-bit entry point */
+    /* Jump to 64-bit code */
+    ljmp $0x08, $long_mode_start
+
+.no_long_mode:
+    /* Halt if no long mode support */
+    cli
+    hlt
+    jmp .no_long_mode
+
+/* Check if CPU supports long mode */
+check_long_mode:
+    /* Check for CPUID support */
+    pushfl
+    popl %eax
+    movl %eax, %ecx
+    xorl $0x200000, %eax
+    pushl %eax
+    popfl
+    pushfl
+    popl %eax
+    pushl %ecx
+    popfl
+    xorl %ecx, %eax
+    jz .no_cpuid
+
+    /* Check for extended CPUID */
+    movl $0x80000000, %eax
+    cpuid
+    cmpl $0x80000001, %eax
+    jb .no_cpuid
+
+    /* Check for long mode */
+    movl $0x80000001, %eax
+    cpuid
+    testl $0x20000000, %edx  /* Long mode bit */
+    jz .no_cpuid
+
+    movl $1, %eax
+    ret
+
+.no_cpuid:
+    movl $0, %eax
+    ret
+
+/* Setup page tables for identity mapping */
+setup_page_tables:
+    /* Clear page tables */
+    movl $pml4_table, %edi
+    movl $0, %eax
+    movl $4096, %ecx
+    rep stosl
+
+    /* Setup PML4: PML4[0] -> PDPT */
+    movl $pml4_table, %edi
+    movl $pdp_table, %eax
+    orl $0x03, %eax       /* Present, writable */
+    movl %eax, (%edi)
+
+    /* Setup PDPT: PDPT[0] -> PD */
+    movl $pdp_table, %edi
+    movl $pd_table, %eax
+    orl $0x03, %eax       /* Present, writable */
+    movl %eax, (%edi)
+
+    /* Setup PD: Map first 2MB with huge pages */
+    movl $pd_table, %edi
+    movl $0x00000083, %eax  /* 0x00000000, present, writable, huge page */
+    movl $512, %ecx
+.map_pd:
+    movl %eax, (%edi)
+    addl $0x200000, %eax    /* Next 2MB */
+    addl $8, %edi
+    loop .map_pd
+
+    ret
+
+/* 64-bit code */
 .code64
-start64:
-    /* Setup data segments */
-    mov $0x10, %ax
-    mov %ax, %ds
-    mov %ax, %es
-    mov %ax, %fs
-    mov %ax, %gs
-    mov %ax, %ss
+long_mode_start:
+    /* Load 64-bit data segment */
+    movw $0x10, %ax
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %fs
+    movw %ax, %gs
+    movw %ax, %ss
 
-    /* Setup stack */
-    lea stack_top(%rip), %rsp
-    xor %rbp, %rbp
+    /* Setup 64-bit stack */
+    movq $stack_top, %rsp
+    xorq %rbp, %rbp
 
-    /* Clear RFLAGS */
-    pushq $0
-    popfq
-
-    /* boot_info pointer is in RDI (or pass NULL for Multiboot2) */
-    xor %rdi, %rdi
+    /* Prepare argument for kernel_main */
+    /* RDI = boot_info pointer (NULL for now, we'll parse Multiboot2 later) */
+    xorq %rdi, %rdi
 
     /* Call kernel main */
     call kernel_main
 
-    /* If kernel_main returns, halt */
+    /* Halt if kernel_main returns */
 .halt:
     cli
     hlt
     jmp .halt
 
 /* Temporary GDT for 64-bit mode */
+.section .data
 .align 16
 gdt64:
     .quad 0x0000000000000000    /* Null descriptor */
-    .quad 0x00209A0000000000    /* Code segment (64-bit) */
-    .quad 0x0000920000000000    /* Data segment */
+    .quad 0x00AF9A000000FFFF    /* Code segment (64-bit) */
+    .quad 0x00AF92000000FFFF    /* Data segment (64-bit) */
 gdt64_end:
 
 gdt64_pointer:
     .word gdt64_end - gdt64 - 1
     .quad gdt64
 
-/* Page tables (4KB each, aligned) */
-.align 4096
-pml4:
-    .skip 4096
-pdpt:
-    .skip 4096
-pd:
-    .skip 4096
+/* Multiboot info pointer storage */
+.section .bss
+.align 4
+multiboot_info_ptr:
+    .long 0
 
 /* Stack */
-.section .bss
 .align 16
 stack_bottom:
-    .skip 16384  /* 16KB stack */
+    .space 16384  /* 16KB stack */
 stack_top:
+
+/* Page tables (identity mapping for first 1GB) */
+.align 4096
+pml4_table:
+    .space 4096
+pdp_table:
+    .space 4096
+pd_table:
+    .space 4096
