@@ -34,6 +34,15 @@ static struct {
     uint64_t page_tables_allocated;
 } vmm_state = {0};
 
+// Static page table buffers for initial identity mapping
+// These break the chicken-and-egg problem: we need page tables to set up
+// identity mapping, but we need identity mapping to access PMM-allocated page tables.
+// After initial setup with these static buffers, we can use PMM normally.
+static page_table_t static_pml4 __attribute__((aligned(4096)));
+static page_table_t static_pdpt __attribute__((aligned(4096)));
+static page_table_t static_pd __attribute__((aligned(4096)));
+static page_table_t static_pt[8] __attribute__((aligned(4096))); // 8 PTs for 16MB (each PT = 2MB)
+
 // Helper macros
 #define ALIGN_DOWN(addr, align) ((addr) & ~((align) - 1))
 #define ALIGN_UP(addr, align)   (((addr) + (align) - 1) & ~((align) - 1))
@@ -347,83 +356,83 @@ bool vmm_unmap_range(uint64_t virt_addr, uint64_t size) {
  */
 void vmm_init(boot_info_t *boot_info) {
     serial_debug_str("vmm_init_start\n");
-    serial_debug_str("vmm_console_print_skipped\n");
-    serial_debug_str("after_vmm_console_print\n");
+    serial_debug_str("using_static_page_tables\n");
 
-    // DEBUG: Before allocation
-    serial_debug_str("before_alloc_pml4_msg\n");
-    serial_debug_str("alloc_pml4_msg_skipped\n");
-    serial_debug_str("after_alloc_pml4_msg\n");
+    // PHASE 1: Set up initial identity mapping using STATIC page table buffers
+    // This solves the chicken-and-egg problem: we need page tables to create
+    // identity mapping, but PMM-allocated page tables need identity mapping to be accessed!
 
-    // Allocate PML4 (top-level page table)
-    serial_debug_str("calling_pmm_alloc_frame\n");
-    uint64_t pml4_phys = pmm_alloc_frame();
-    serial_debug_str("after_pmm_alloc_frame\n");
-
-    // DEBUG: After allocation
-    serial_debug_str("before_pmm_result_msg\n");
-    serial_debug_str("pmm_result_msg_skipped\n");
-    serial_debug_str("after_pmm_result_msg\n");
-
-    if (pml4_phys == 0) {
-        serial_debug_str("pml4_alloc_failed\n");
-        console_print("[VMM] ERROR: Failed to allocate PML4\n");
-        return;
-    }
-
-    serial_debug_str("before_pml4_setup\n");
-    kernel_pml4 = (page_table_t*)pml4_phys;
-    vmm_state.pml4_physical = pml4_phys;
-    vmm_state.page_tables_allocated = 1;
-    serial_debug_str("after_pml4_setup\n");
-
-    // DEBUG: Before zeroing
-    serial_debug_str("before_pml4_zero_msg\n");
-    serial_debug_str("pml4_zero_msg_skipped\n");
-    serial_debug_str("after_pml4_zero_msg\n");
-
-    // Zero out PML4
-    serial_debug_str("before_pml4_zero_loop\n");
+    serial_debug_str("zero_static_pml4\n");
+    // Zero static page tables
     for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
-        kernel_pml4->entries[i] = 0;
+        static_pml4.entries[i] = 0;
     }
-    serial_debug_str("after_pml4_zero_loop\n");
+    serial_debug_str("zero_static_pdpt\n");
+    for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+        static_pdpt.entries[i] = 0;
+    }
+    serial_debug_str("zero_static_pd\n");
+    for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+        static_pd.entries[i] = 0;
+    }
+    // Skip zeroing PTs - we'll fill them completely with identity mapping below
+    // This avoids 4096 extra loop iterations that could cause stack issues
+    serial_debug_str("static_tables_zeroed\n");
 
-    // DEBUG: After zeroing
-    serial_debug_str("before_zeroed_msg\n");
-    serial_debug_str("pml4_zeroed_msg_skipped\n");
-    serial_debug_str("after_zeroed_msg\n");
+    // Get physical addresses of static buffers (they're in kernel .bss)
+    serial_debug_str("get_static_addrs\n");
+    uint64_t pml4_phys = (uint64_t)&static_pml4;
+    uint64_t pdpt_phys = (uint64_t)&static_pdpt;
+    uint64_t pd_phys = (uint64_t)&static_pd;
+    serial_debug_str("got_static_addrs\n");
 
-    serial_debug_str("before_pml4_print\n");
-    serial_debug_str("pml4_print_skipped\n");
-    serial_debug_str("after_pml4_print\n");
+    // Build identity mapping manually for first 16MB (0x0 - 0xFFFFFF)
+    // Structure: PML4[0] -> PDPT[0] -> PD[0-7] -> PT[0-7]
+    // Each PT maps 2MB (512 entries * 4KB), so 8 PTs map 16MB
 
-    serial_debug_str("before_vmm_init_flag\n");
+    // PML4[0] -> PDPT
+    serial_debug_str("setup_pml4_entry\n");
+    static_pml4.entries[0] = pte_create(pdpt_phys, PTE_PRESENT | PTE_WRITE);
+
+    // PDPT[0] -> PD
+    serial_debug_str("setup_pdpt_entry\n");
+    static_pdpt.entries[0] = pte_create(pd_phys, PTE_PRESENT | PTE_WRITE);
+
+    // PD[0-7] -> PT[0-7]
+    serial_debug_str("setup_pd_entries\n");
+    for (int i = 0; i < 8; i++) {
+        uint64_t pt_phys = (uint64_t)&static_pt[i];
+        static_pd.entries[i] = pte_create(pt_phys, PTE_PRESENT | PTE_WRITE);
+    }
+
+    // Fill PT entries to map physical pages (identity mapping)
+    serial_debug_str("setup_pt_entries\n");
+    for (int pt_idx = 0; pt_idx < 8; pt_idx++) {
+        for (int entry = 0; entry < ENTRIES_PER_TABLE; entry++) {
+            // Calculate physical address: (pt_idx * 2MB) + (entry * 4KB)
+            uint64_t phys_addr = (pt_idx * 2 * 1024 * 1024) + (entry * PAGE_SIZE);
+            static_pt[pt_idx].entries[entry] = pte_create(phys_addr, PTE_PRESENT | PTE_WRITE);
+        }
+    }
+    serial_debug_str("identity_map_complete\n");
+
+    // Set up VMM state
+    kernel_pml4 = &static_pml4;
+    vmm_state.pml4_physical = pml4_phys;
+    vmm_state.page_tables_allocated = 10; // PML4 + PDPT + PD + 8 PTs
+    vmm_state.kernel_pages = 4096; // 16MB = 4096 pages
     vmm_initialized = true;
-    serial_debug_str("after_vmm_init_flag\n");
+    serial_debug_str("vmm_state_initialized\n");
 
-    // DEBUG: VMM initialized flag set
-    serial_debug_str("before_init_flag_msg\n");
-    serial_debug_str("init_flag_msg_skipped\n");
-    serial_debug_str("after_init_flag_msg\n");
+    // Load the new page tables (activate identity mapping)
+    serial_debug_str("loading_cr3\n");
+    vmm_load_cr3(pml4_phys);
+    serial_debug_str("cr3_loaded\n");
 
-    // Identity map first 16MB (all available physical memory)
-    // This allows page tables allocated by PMM to be accessible
-    // since PMM can allocate from anywhere in physical memory
-    serial_debug_str("before_identity_map_msg\n");
-    serial_debug_str("identity_map_msg_skipped\n");
-    serial_debug_str("after_identity_map_msg\n");
-    serial_debug_str("before_vmm_map_range_call\n");
-    if (!vmm_map_range(0x0, 0x0, 16 * 1024 * 1024, PTE_KERNEL_FLAGS)) {
-        serial_debug_str("identity_map_failed\n");
-        console_print("[VMM] ERROR: Failed to identity map\n");
-        return;
-    }
-    serial_debug_str("after_vmm_map_range_call\n");
-    serial_debug_str("identity_complete_msg_skipped\n");
-    serial_debug_str("after_identity_complete_msg\n");
-    vmm_state.kernel_pages += 4096; // 16MB = 4096 pages
-    serial_debug_str("after_kernel_pages_update\n");
+    console_print("[VMM] Identity mapping active (16MB)\n");
+
+    // PHASE 2: Now we can use vmm_map_range for additional mappings
+    // since identity mapping is active and PMM allocations are accessible
 
     // Map kernel to higher-half (if boot_info available)
     serial_debug_str("before_boot_info_check\n");
