@@ -58,10 +58,9 @@ _start:
     movl %eax, %cr0
 
     /* Load 64-bit GDT */
-    /* Use address-size prefix to force 32-bit absolute addressing */
-    /* This prevents assembler from using RIP-relative addressing */
-    .byte 0x67  /* Address-size override prefix */
-    lgdt (gdt64_pointer)
+    /* Load address into register first, then use register-indirect addressing */
+    movl $gdt64_pointer, %eax
+    lgdt (%eax)
 
     /* Jump to 64-bit code */
     /* Manual far jump encoding to avoid assembler issues */
