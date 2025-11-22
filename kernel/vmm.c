@@ -350,10 +350,13 @@ void vmm_init(boot_info_t *boot_info) {
 
     // PD[0-7] = 2MB huge pages (0-16MB)
     // Each PD entry points directly to a 2MB physical region (no PT needed!)
+    serial_debug_str("before_pd_loop\n");
     for (int i = 0; i < 8; i++) {
+        serial_debug_char('0' + i);  // Print loop index: 0,1,2,3,4,5,6,7
         uint64_t phys_addr = i * 2 * 1024 * 1024;  // 0MB, 2MB, 4MB, ..., 14MB
         static_pd.entries[i] = pte_create(phys_addr, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
     }
+    serial_debug_str("\nafter_pd_loop\n");
 
     // Set up VMM state
     kernel_pml4 = &static_pml4;
