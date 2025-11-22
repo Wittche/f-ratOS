@@ -319,12 +319,12 @@ bool vmm_unmap_range(uint64_t virt_addr, uint64_t size) {
  */
 void vmm_init(boot_info_t *boot_info) {
     serial_debug_str("vmm_init_start\n");
-    console_print("[VMM] Initializing Virtual Memory Manager...\n");
+    serial_debug_str("vmm_console_print_skipped\n");
     serial_debug_str("after_vmm_console_print\n");
 
     // DEBUG: Before allocation
     serial_debug_str("before_alloc_pml4_msg\n");
-    console_print("[DEBUG] About to allocate PML4...\n");
+    serial_debug_str("alloc_pml4_msg_skipped\n");
     serial_debug_str("after_alloc_pml4_msg\n");
 
     // Allocate PML4 (top-level page table)
@@ -334,9 +334,7 @@ void vmm_init(boot_info_t *boot_info) {
 
     // DEBUG: After allocation
     serial_debug_str("before_pmm_result_msg\n");
-    console_print("[DEBUG] PMM returned: ");
-    console_print_hex(pml4_phys);
-    console_print("\n");
+    serial_debug_str("pmm_result_msg_skipped\n");
     serial_debug_str("after_pmm_result_msg\n");
 
     if (pml4_phys == 0) {
@@ -353,7 +351,7 @@ void vmm_init(boot_info_t *boot_info) {
 
     // DEBUG: Before zeroing
     serial_debug_str("before_pml4_zero_msg\n");
-    console_print("[DEBUG] About to zero out PML4...\n");
+    serial_debug_str("pml4_zero_msg_skipped\n");
     serial_debug_str("after_pml4_zero_msg\n");
 
     // Zero out PML4
@@ -365,13 +363,11 @@ void vmm_init(boot_info_t *boot_info) {
 
     // DEBUG: After zeroing
     serial_debug_str("before_zeroed_msg\n");
-    console_print("[DEBUG] PML4 zeroed successfully\n");
+    serial_debug_str("pml4_zeroed_msg_skipped\n");
     serial_debug_str("after_zeroed_msg\n");
 
     serial_debug_str("before_pml4_print\n");
-    console_print("[VMM] PML4 allocated at ");
-    console_print_hex(pml4_phys);
-    console_print("\n");
+    serial_debug_str("pml4_print_skipped\n");
     serial_debug_str("after_pml4_print\n");
 
     serial_debug_str("before_vmm_init_flag\n");
@@ -380,12 +376,12 @@ void vmm_init(boot_info_t *boot_info) {
 
     // DEBUG: VMM initialized flag set
     serial_debug_str("before_init_flag_msg\n");
-    console_print("[DEBUG] vmm_initialized = true\n");
+    serial_debug_str("init_flag_msg_skipped\n");
     serial_debug_str("after_init_flag_msg\n");
 
     // Identity map first 4MB (for VGA, BIOS, bootloader compatibility)
     serial_debug_str("before_identity_map_msg\n");
-    console_print("[VMM] Identity mapping first 4MB...\n");
+    serial_debug_str("identity_map_msg_skipped\n");
     serial_debug_str("after_identity_map_msg\n");
     serial_debug_str("before_vmm_map_range_call\n");
     if (!vmm_map_range(0x0, 0x0, 4 * 1024 * 1024, PTE_KERNEL_FLAGS)) {
@@ -394,7 +390,7 @@ void vmm_init(boot_info_t *boot_info) {
         return;
     }
     serial_debug_str("after_vmm_map_range_call\n");
-    console_print("[DEBUG] Identity mapping complete\n");
+    serial_debug_str("identity_complete_msg_skipped\n");
     serial_debug_str("after_identity_complete_msg\n");
     vmm_state.kernel_pages += 1024; // 4MB = 1024 pages
     serial_debug_str("after_kernel_pages_update\n");
@@ -408,14 +404,7 @@ void vmm_init(boot_info_t *boot_info) {
         uint64_t kernel_virt = KERNEL_VIRTUAL_BASE;
 
         serial_debug_str("before_kernel_map_msg\n");
-        console_print("[VMM] Mapping kernel to higher-half...\n");
-        console_print("[VMM]   Physical: ");
-        console_print_hex(kernel_phys);
-        console_print("\n[VMM]   Virtual:  ");
-        console_print_hex(kernel_virt);
-        console_print("\n[VMM]   Size:     ");
-        console_print_hex(kernel_size);
-        console_print(" bytes\n");
+        serial_debug_str("kernel_map_msg_skipped\n");
         serial_debug_str("after_kernel_map_msg\n");
 
         serial_debug_str("before_kernel_map_range\n");
@@ -432,7 +421,7 @@ void vmm_init(boot_info_t *boot_info) {
     } else {
         serial_debug_str("boot_info_invalid_test_mode\n");
         // Test mode: Map kernel at 1MB
-        console_print("[VMM] Test mode: Identity mapping kernel at 1MB...\n");
+        serial_debug_str("test_mode_msg_skipped\n");
         uint64_t kernel_size = 1024 * 1024; // Assume 1MB kernel
         serial_debug_str("before_test_map_range\n");
         if (!vmm_map_range(KERNEL_PHYSICAL_BASE, KERNEL_PHYSICAL_BASE,
@@ -447,22 +436,17 @@ void vmm_init(boot_info_t *boot_info) {
 
     // Setup recursive mapping (last PML4 entry points to itself)
     serial_debug_str("before_recursive_map_msg\n");
-    console_print("[VMM] Setting up recursive mapping...\n");
+    serial_debug_str("recursive_map_msg_skipped\n");
     serial_debug_str("after_recursive_map_msg\n");
     serial_debug_str("before_recursive_map_set\n");
     kernel_pml4->entries[RECURSIVE_SLOT] = pte_create(pml4_phys, PTE_KERNEL_FLAGS);
     serial_debug_str("after_recursive_map_set\n");
 
     serial_debug_str("before_vmm_complete_msg\n");
-    console_print("[VMM] Initialization complete\n");
+    serial_debug_str("vmm_complete_msg_skipped\n");
     serial_debug_str("after_vmm_complete_msg\n");
-    console_print("[VMM]   Page tables allocated: ");
-    console_print_dec(vmm_state.page_tables_allocated);
-    console_print("\n[VMM]   Pages mapped: ");
-    console_print_dec(vmm_state.mapped_pages);
-    console_print("\n[VMM]   Kernel pages: ");
-    console_print_dec(vmm_state.kernel_pages);
-    console_print("\n");
+    serial_debug_str("vmm_stats_skipped\n");
+    serial_debug_str("vmm_init_complete\n");
 }
 
 /**
