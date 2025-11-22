@@ -136,11 +136,13 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
 
         // Allocate new PDPT
         serial_debug_str("alloc_pdpt\n");
-        console_print("[DEBUG] Allocating new PDPT...\n");
+        // console_print("[DEBUG] Allocating new PDPT...\n");  // SKIP - causes hang
+        serial_debug_str("pdpt_allocation_msg_skipped\n");
         uint64_t pdpt_phys = pmm_alloc_frame();
-        console_print("[DEBUG] PDPT allocated at: ");
-        console_print_hex(pdpt_phys);
-        console_print("\n");
+        // console_print("[DEBUG] PDPT allocated at: ");  // SKIP - causes hang
+        // console_print_hex(pdpt_phys);  // SKIP - causes hang
+        // console_print("\n");  // SKIP - causes hang
+        serial_debug_str("pdpt_allocated\n");
         if (pdpt_phys == 0) return NULL;
 
         *pml4_entry = pte_create(pdpt_phys, PTE_KERNEL_FLAGS);
