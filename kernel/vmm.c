@@ -144,14 +144,11 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         vmm_state.page_tables_allocated++;
 
         // Zero out the new table
-        // DISABLED: Zeroing unmapped physical memory causes triple fault
-        // TODO: Enable after proper virtual memory mapping is set up
         serial_debug_str("before_pdpt_zero\n");
-        serial_debug_str("pdpt_zero_disabled\n");
         pdpt = (page_table_t*)pdpt_phys;
-        // for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
-        //     pdpt->entries[i] = 0;
-        // }
+        for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+            pdpt->entries[i] = 0;
+        }
         serial_debug_str("after_pdpt_zero\n");
     } else {
         pdpt = (page_table_t*)pte_get_addr(*pml4_entry);
@@ -173,13 +170,11 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         vmm_state.page_tables_allocated++;
 
         // Zero out the new table
-        // DISABLED: Zeroing unmapped physical memory causes triple fault
         serial_debug_str("before_pd_zero\n");
-        serial_debug_str("pd_zero_disabled\n");
         pd = (page_table_t*)pd_phys;
-        // for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
-        //     pd->entries[i] = 0;
-        // }
+        for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+            pd->entries[i] = 0;
+        }
         serial_debug_str("after_pd_zero\n");
     } else {
         pd = (page_table_t*)pte_get_addr(*pdpt_entry);
@@ -207,13 +202,11 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         vmm_state.page_tables_allocated++;
 
         // Zero out the new table
-        // DISABLED: Zeroing unmapped physical memory causes triple fault
         serial_debug_str("before_pt_zero\n");
-        serial_debug_str("pt_zero_disabled\n");
         pt = (page_table_t*)pt_phys;
-        // for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
-        //     pt->entries[i] = 0;
-        // }
+        for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+            pt->entries[i] = 0;
+        }
         serial_debug_str("after_pt_zero\n");
     } else {
         pt = (page_table_t*)pte_get_addr(*pd_entry);
@@ -368,12 +361,10 @@ void vmm_init(boot_info_t *boot_info) {
     serial_debug_str("after_pml4_zero_msg\n");
 
     // Zero out PML4
-    // DISABLED: Zeroing unmapped physical memory causes triple fault
     serial_debug_str("before_pml4_zero_loop\n");
-    serial_debug_str("pml4_zero_disabled\n");
-    // for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
-    //     kernel_pml4->entries[i] = 0;
-    // }
+    for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+        kernel_pml4->entries[i] = 0;
+    }
     serial_debug_str("after_pml4_zero_loop\n");
 
     // DEBUG: After zeroing
