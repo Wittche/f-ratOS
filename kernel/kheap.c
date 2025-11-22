@@ -161,17 +161,23 @@ void kheap_coalesce(void) {
  * Expand heap by allocating more pages
  */
 void kheap_expand(uint64_t size) {
+    serial_debug_str("expand_enter\n");
+
     // Align size to page boundary
     size = ALIGN_UP(size, PAGE_SIZE);
+    serial_debug_str("aligned\n");
 
     // Check max heap size
     if (heap_state.heap_size + size > HEAP_MAX_SIZE) {
+        serial_debug_str("max_size_reached\n");
         console_print("[HEAP] WARNING: Max heap size reached\n");
         return;
     }
+    serial_debug_str("size_ok\n");
 
     // Allocate physical pages
     uint64_t num_pages = size / PAGE_SIZE;
+    serial_debug_str("calc_pages\n");
 
     for (uint64_t i = 0; i < num_pages; i++) {
         // Progress indicator every 64 pages
