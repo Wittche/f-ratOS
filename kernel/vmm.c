@@ -318,10 +318,13 @@ bool vmm_unmap_range(uint64_t virt_addr, uint64_t size) {
  * Initialize Virtual Memory Manager
  */
 void vmm_init(boot_info_t *boot_info) {
+    serial_debug_str("vmm_init_entered\n");
+
     // PHASE 1: Set up initial identity mapping using STATIC page table buffers
     // This solves the chicken-and-egg problem: we need page tables to create
     // identity mapping, but PMM-allocated page tables need identity mapping to be accessed!
 
+    serial_debug_str("get_static_addrs\n");
     // Get physical addresses of static buffers (they're in kernel .bss, already zeroed)
     uint64_t pml4_phys = (uint64_t)&static_pml4;
     uint64_t pdpt_phys = (uint64_t)&static_pdpt;
