@@ -344,11 +344,17 @@ void vmm_init(boot_info_t *boot_info) {
     serial_debug_str("BEFORE_CONSOLE_PRINT\n");
 
     // TEST: Direct VGA write bypassing console API
+    // Write to top-left corner of screen for maximum visibility
     serial_debug_str("TEST_DIRECT_VGA_WRITE\n");
     volatile uint16_t *vga = (volatile uint16_t*)0xB8000;
-    vga[80] = 0x4F56; // 'V' with white on red background - should be visible on line 2
-    vga[81] = 0x4F4D; // 'M'
-    vga[82] = 0x4F4D; // 'M'
+    vga[0] = 0x4F54;  // 'T' white on red
+    vga[1] = 0x4F45;  // 'E'
+    vga[2] = 0x4F53;  // 'S'
+    vga[3] = 0x4F54;  // 'T'
+    vga[4] = 0x4F2D;  // '-'
+    vga[5] = 0x4F56;  // 'V'
+    vga[6] = 0x4F4D;  // 'M'
+    vga[7] = 0x4F4D;  // 'M'
     serial_debug_str("DIRECT_VGA_WRITE_DONE\n");
 
     console_print("[VMM] Using boot page tables (1GB identity mapping)\n");
