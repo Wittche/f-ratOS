@@ -9,6 +9,18 @@
 #include "vmm.h"
 #include "console.h"
 #include "types.h"
+#include "io.h"
+
+// Serial debug helpers (COM1 = 0x3F8)
+static inline void serial_debug_char(char c) {
+    outb(0x3F8, c);
+}
+
+static inline void serial_debug_str(const char *s) {
+    while (*s) {
+        serial_debug_char(*s++);
+    }
+}
 
 // Block header structure
 typedef struct block_header {
@@ -160,7 +172,13 @@ void kheap_expand(uint64_t size) {
 
     // Allocate physical pages
     uint64_t num_pages = size / PAGE_SIZE;
+
     for (uint64_t i = 0; i < num_pages; i++) {
+        // Progress indicator every 64 pages
+        if (i % 64 == 0) {
+            serial_debug_char('.');
+        }
+
         uint64_t phys = pmm_alloc_frame();
         if (phys == 0) {
             console_print("[HEAP] ERROR: Failed to allocate physical page\n");
