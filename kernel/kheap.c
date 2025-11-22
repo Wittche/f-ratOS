@@ -180,7 +180,9 @@ void kheap_expand(uint64_t size) {
         }
 
         serial_debug_str("alloc\n");
+        serial_debug_str("call_pmm\n");
         uint64_t phys = pmm_alloc_frame();
+        serial_debug_str("ret_pmm\n");
         if (phys == 0) {
             serial_debug_str("alloc_failed\n");
             console_print("[HEAP] ERROR: Failed to allocate physical page\n");
