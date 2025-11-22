@@ -1,51 +1,41 @@
-/**
- * AuroraOS Multiboot2 Header
- * Allows 64-bit kernel to be loaded by GRUB2 and QEMU
- */
+/* Multiboot2 Header for GRUB */
+/* This MUST be in the first 32KB of the kernel binary */
 
 .section .multiboot
 .align 8
 
-/* Multiboot2 header constants */
-.set MULTIBOOT2_MAGIC,           0xE85250D6
-.set MULTIBOOT2_ARCHITECTURE,    0          /* i386 (also used for x86_64) */
-.set MULTIBOOT2_HEADER_LENGTH,   (multiboot_header_end - multiboot_header_start)
-.set MULTIBOOT2_CHECKSUM,        -(MULTIBOOT2_MAGIC + MULTIBOOT2_ARCHITECTURE + MULTIBOOT2_HEADER_LENGTH)
-
-/* Multiboot2 header */
+/* Multiboot2 Header Start */
 multiboot_header_start:
-    .long MULTIBOOT2_MAGIC
-    .long MULTIBOOT2_ARCHITECTURE
-    .long MULTIBOOT2_HEADER_LENGTH
-    .long MULTIBOOT2_CHECKSUM
+    .long 0xe85250d6                        /* Magic number (Multiboot2) */
+    .long 0                                 /* Architecture: i386 protected mode */
+    .long multiboot_header_end - multiboot_header_start  /* Header length */
+    .long -(0xe85250d6 + 0 + (multiboot_header_end - multiboot_header_start))  /* Checksum */
 
-    /* Entry address tag - tell bootloader where to jump */
+    /* Information Request Tag */
     .align 8
-    .short 3    /* type = 3 (entry address) */
-    .short 0    /* flags */
-    .long 12    /* size */
-    .long 0x101000  /* entry_addr = _start symbol address */
+    .short 1                                /* Type: Information request */
+    .short 0                                /* Flags: required */
+    .long info_request_end - info_request_start  /* Size */
+info_request_start:
+    .long 3                                 /* Request: Module info */
+    .long 4                                 /* Request: Basic memory info */
+    .long 6                                 /* Request: Memory map */
+    .long 8                                 /* Request: Framebuffer info */
+info_request_end:
 
-    /* Information request tag (optional) */
+    /* Framebuffer Tag (optional) */
     .align 8
-    .short 1    /* type = 1 (information request) */
-    .short 0    /* flags */
-    .long 16    /* size */
-    .long 4     /* request memory map */
-    .long 6     /* request memory basic info */
+    .short 5                                /* Type: Framebuffer */
+    .short 1                                /* Flags: optional */
+    .long 20                                /* Size */
+    .long 0                                 /* Width (0 = no preference) */
+    .long 0                                 /* Height (0 = no preference) */
+    .long 32                                /* Depth (32 bits per pixel) */
 
-    /* Framebuffer tag (optional) */
+    /* End Tag */
     .align 8
-    .short 5    /* type = 5 (framebuffer) */
-    .short 0    /* flags */
-    .long 20    /* size */
-    .long 1024  /* width */
-    .long 768   /* height */
-    .long 32    /* depth */
+    .short 0                                /* Type: End tag */
+    .short 0                                /* Flags */
+    .long 8                                 /* Size */
 
-    /* End tag (required) */
-    .align 8
-    .short 0    /* type = 0 (end) */
-    .short 0    /* flags */
-    .long 8     /* size */
 multiboot_header_end:
