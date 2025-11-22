@@ -207,11 +207,17 @@ void kheap_expand(uint64_t size) {
 
     // Create new free block at end of heap
     serial_debug_str("creating_free_block\n");
+    serial_debug_str("casting_to_block_ptr\n");
     block_header_t *new_block = (block_header_t*)heap_state.heap_end;
+    serial_debug_str("setting_size\n");
     new_block->size = size - HEADER_SIZE;
+    serial_debug_str("setting_flags\n");
     new_block->flags = BLOCK_FREE;
+    serial_debug_str("setting_magic\n");
     new_block->magic = BLOCK_MAGIC;
+    serial_debug_str("setting_next\n");
     new_block->next = NULL;
+    serial_debug_str("setting_prev\n");
     new_block->prev = NULL;
     serial_debug_str("free_block_created\n");
 

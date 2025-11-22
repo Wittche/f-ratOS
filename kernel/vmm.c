@@ -134,78 +134,115 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         return NULL;
     }
 
+    serial_debug_str("parse_vaddr\n");
     virt_addr_t vaddr = vmm_parse_address(virt_addr);
 
     // Walk PML4
+    serial_debug_str("walk_pml4\n");
     pte_t *pml4_entry = &kernel_pml4->entries[vaddr.pml4_index];
     page_table_t *pdpt;
 
     if (!(*pml4_entry & PTE_PRESENT)) {
-        if (!create) return NULL;
+        if (!create) {
+            serial_debug_str("pml4_entry_not_present_no_create\n");
+            return NULL;
+        }
 
+        serial_debug_str("alloc_new_pdpt\n");
         // Allocate new PDPT
         uint64_t pdpt_phys = pmm_alloc_frame();
-        if (pdpt_phys == 0) return NULL;
+        if (pdpt_phys == 0) {
+            serial_debug_str("pdpt_alloc_failed\n");
+            return NULL;
+        }
+        serial_debug_str("pdpt_allocated\n");
 
+        serial_debug_str("create_pml4_entry\n");
         *pml4_entry = pte_create(pdpt_phys, PTE_KERNEL_FLAGS);
+        serial_debug_str("pml4_entry_created\n");
         vmm_state.page_tables_allocated++;
 
+        serial_debug_str("cast_pdpt_phys\n");
         // No need to zero - garbage in unused entries is safe (they're never accessed)
         pdpt = (page_table_t*)pdpt_phys;
+        serial_debug_str("pdpt_casted\n");
     } else {
+        serial_debug_str("pml4_entry_present\n");
         pdpt = (page_table_t*)pte_get_addr(*pml4_entry);
     }
 
     // Walk PDPT
+    serial_debug_str("walk_pdpt\n");
     pte_t *pdpt_entry = &pdpt->entries[vaddr.pdpt_index];
     page_table_t *pd;
 
     if (!(*pdpt_entry & PTE_PRESENT)) {
         if (!create) return NULL;
 
+        serial_debug_str("alloc_new_pd\n");
         // Allocate new PD
         uint64_t pd_phys = pmm_alloc_frame();
-        if (pd_phys == 0) return NULL;
+        if (pd_phys == 0) {
+            serial_debug_str("pd_alloc_failed\n");
+            return NULL;
+        }
+        serial_debug_str("pd_allocated\n");
 
+        serial_debug_str("create_pdpt_entry\n");
         *pdpt_entry = pte_create(pd_phys, PTE_KERNEL_FLAGS);
+        serial_debug_str("pdpt_entry_created\n");
         vmm_state.page_tables_allocated++;
 
+        serial_debug_str("cast_pd_phys\n");
         // No need to zero - garbage in unused entries is safe (they're never accessed)
         pd = (page_table_t*)pd_phys;
+        serial_debug_str("pd_casted\n");
     } else {
+        serial_debug_str("pdpt_entry_present\n");
         pd = (page_table_t*)pte_get_addr(*pdpt_entry);
     }
 
     // Walk PD
+    serial_debug_str("walk_pd\n");
     pte_t *pd_entry = &pd->entries[vaddr.pd_index];
     page_table_t *pt;
 
     if (!(*pd_entry & PTE_PRESENT)) {
         if (!create) {
+            serial_debug_str("pd_entry_not_present_no_create\n");
             return NULL;
         }
 
+        serial_debug_str("alloc_new_pt\n");
         // Allocate new PT
         uint64_t pt_phys = pmm_alloc_frame();
         if (pt_phys == 0) {
+            serial_debug_str("pt_alloc_failed\n");
             return NULL;
         }
+        serial_debug_str("pt_allocated\n");
 
+        serial_debug_str("create_pd_entry\n");
         *pd_entry = pte_create(pt_phys, PTE_KERNEL_FLAGS);
+        serial_debug_str("pd_entry_created\n");
         vmm_state.page_tables_allocated++;
 
+        serial_debug_str("cast_pt_phys\n");
         // Zero out the new table
         // DISABLED: 512-iteration loop causes stack overflow!
         // PMM should ideally return zeroed pages, but for now we accept garbage in unused entries.
         // Only entries we explicitly map will be set, unmapped entries remain garbage (but not accessed).
         pt = (page_table_t*)pt_phys;
+        serial_debug_str("pt_casted\n");
         // for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
         //     pt->entries[i] = 0;
         // }
     } else {
+        serial_debug_str("pd_entry_present\n");
         pt = (page_table_t*)pte_get_addr(*pd_entry);
     }
 
+    serial_debug_str("return_pte\n");
     // Return pointer to final PT entry
     return &pt->entries[vaddr.pt_index];
 }
