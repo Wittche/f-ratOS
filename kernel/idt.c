@@ -158,6 +158,14 @@ void idt_init(void) {
     // Load IDT
     idt_ptr.limit = sizeof(idt) - 1;
     idt_ptr.base = (uint64_t)&idt;
+
+    console_print("[IDT] IDT pointer prepared:\n");
+    console_print("  Base:  ");
+    console_print_hex(idt_ptr.base);
+    console_print("\n  Limit: ");
+    console_print_hex(idt_ptr.limit);
+    console_print("\n");
+
     idt_load();
 
     console_print("[IDT] Loaded with 256 entries\n");

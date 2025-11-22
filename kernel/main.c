@@ -99,14 +99,17 @@ void kernel_main(boot_info_t *boot_info) {
     console_print("\n[KERNEL] Initializing subsystems...\n");
 
     // Initialize GDT (must be done before IDT and TSS)
+    console_print("[DEBUG] About to initialize GDT...\n");
     gdt_init();
     console_print("  [OK] GDT (Global Descriptor Table)\n");
 
     // Initialize TSS (must be done after GDT)
+    console_print("[DEBUG] About to initialize TSS...\n");
     tss_init();
     console_print("  [OK] TSS (Task State Segment)\n");
 
     // Initialize IDT
+    console_print("[DEBUG] About to initialize IDT...\n");
     idt_init();
     console_print("  [OK] IDT (Interrupt Descriptor Table)\n");
 
