@@ -3,7 +3,7 @@
  * Allows 64-bit kernel to be loaded by GRUB2 and QEMU
  */
 
-.section .multiboot
+.section .multiboot, "a"
 .align 8
 
 /* Multiboot2 header constants */
