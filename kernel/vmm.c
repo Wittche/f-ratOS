@@ -386,12 +386,14 @@ void vmm_init(boot_info_t *boot_info) {
 
     // DEBUG: VMM initialized flag set
     serial_debug_str("before_init_flag_msg\n");
-    console_print("[DEBUG] vmm_initialized = true\n");
+    // console_print("[DEBUG] vmm_initialized = true\n");  // SKIP
+    serial_debug_str("vmm_init_flag_set\n");
     serial_debug_str("after_init_flag_msg\n");
 
     // Identity map first 4MB (for VGA, BIOS, bootloader compatibility)
     serial_debug_str("before_identity_map_msg\n");
-    console_print("[VMM] Identity mapping first 4MB...\n");
+    // console_print("[VMM] Identity mapping first 4MB...\n");  // SKIP
+    serial_debug_str("starting_identity_map\n");
     serial_debug_str("after_identity_map_msg\n");
     serial_debug_str("before_vmm_map_range_call\n");
     if (!vmm_map_range(0x0, 0x0, 4 * 1024 * 1024, PTE_KERNEL_FLAGS)) {
