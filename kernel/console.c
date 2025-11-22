@@ -94,22 +94,36 @@ void console_clear(void) {
 static void console_scroll(void) {
     if (!console.buffer) return;
 
-    // Move all lines up
-    for (uint32_t y = 1; y < console.height; y++) {
-        for (uint32_t x = 0; x < console.width; x++) {
-            const uint32_t src = y * console.width + x;
-            const uint32_t dst = (y - 1) * console.width + x;
-            console.buffer[dst] = console.buffer[src];
-        }
-    }
+    // WORKAROUND: The 2000-iteration loop below causes kernel crashes
+    // when called after other long loops (TSS, PMM, VMM initialization).
+    // Pattern: Long loops corrupt VGA/console state, making subsequent
+    // console_scroll() calls crash the kernel.
+    //
+    // TEMPORARY FIX: Instead of scrolling, wrap cursor to top of screen.
+    // This prevents the crash and allows kernel to boot.
+    // TODO: Investigate why long loops corrupt console state.
 
-    // Clear last line
-    const uint32_t last_line = (console.height - 1) * console.width;
-    for (uint32_t x = 0; x < console.width; x++) {
-        console.buffer[last_line + x] = vga_entry(' ', console.color);
-    }
+    console.row = 0;
+    console.col = 0;
+    return;
 
-    console.row = console.height - 1;
+    // ORIGINAL CODE (DISABLED - causes crash):
+    // // Move all lines up
+    // for (uint32_t y = 1; y < console.height; y++) {
+    //     for (uint32_t x = 0; x < console.width; x++) {
+    //         const uint32_t src = y * console.width + x;
+    //         const uint32_t dst = (y - 1) * console.width + x;
+    //         console.buffer[dst] = console.buffer[src];
+    //     }
+    // }
+    //
+    // // Clear last line
+    // const uint32_t last_line = (console.height - 1) * console.width;
+    // for (uint32_t x = 0; x < console.width; x++) {
+    //     console.buffer[last_line + x] = vga_entry(' ', console.color);
+    // }
+    //
+    // console.row = console.height - 1;
 }
 
 // Put character at current position
