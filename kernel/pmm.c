@@ -242,19 +242,28 @@ uint64_t pmm_alloc_frame(void) {
     for (uint64_t page = 0; page < pmm_state.highest_page; page++) {
         if (!bitmap_test(page)) {
             serial_debug_str("found_free_page\n");
+            serial_debug_str("before_console_print_page\n");
             console_print("[DEBUG] PMM: Found free page ");
+            serial_debug_str("after_console_print_page\n");
+            serial_debug_str("before_console_print_dec\n");
             console_print_dec(page);
+            serial_debug_str("after_console_print_dec\n");
             console_print("\n");
+            serial_debug_str("after_console_newline\n");
 
+            serial_debug_str("before_bitmap_set\n");
             bitmap_set(page);
+            serial_debug_str("after_bitmap_set\n");
             pmm_state.free_pages--;
             pmm_state.used_pages++;
+            serial_debug_str("after_state_update\n");
 
             uint64_t addr = PAGE_TO_ADDR(page);
-            serial_debug_str("returning_address\n");
+            serial_debug_str("before_returning_msg\n");
             console_print("[DEBUG] PMM: Returning address ");
             console_print_hex(addr);
             console_print("\n");
+            serial_debug_str("returning_address\n");
 
             return addr;
         }
