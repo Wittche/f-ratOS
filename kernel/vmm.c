@@ -172,20 +172,29 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         // Zero out the new table
         serial_debug_str("before_pd_zero\n");
         pd = (page_table_t*)pd_phys;
+        serial_debug_str("pd_zero_loop_start\n");
         for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
             pd->entries[i] = 0;
         }
+        serial_debug_str("pd_zero_loop_end\n");
         serial_debug_str("after_pd_zero\n");
     } else {
         pd = (page_table_t*)pte_get_addr(*pdpt_entry);
     }
 
     // Walk PD
+    serial_debug_str("before_pd_walk\n");
     pte_t *pd_entry = &pd->entries[vaddr.pd_index];
+    serial_debug_str("after_pd_entry_get\n");
     page_table_t *pt;
 
+    serial_debug_str("checking_pd_present\n");
     if (!(*pd_entry & PTE_PRESENT)) {
-        if (!create) return NULL;
+        serial_debug_str("pd_not_present\n");
+        if (!create) {
+            serial_debug_str("create_false_return\n");
+            return NULL;
+        }
 
         // Allocate new PT
         serial_debug_str("alloc_pt\n");
@@ -198,19 +207,26 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         }
         serial_debug_str("pt_alloc_success\n");
 
+        serial_debug_str("before_pt_pte_create\n");
         *pd_entry = pte_create(pt_phys, PTE_KERNEL_FLAGS);
+        serial_debug_str("after_pt_pte_create\n");
         vmm_state.page_tables_allocated++;
+        serial_debug_str("pt_count_incremented\n");
 
         // Zero out the new table
         serial_debug_str("before_pt_zero\n");
         pt = (page_table_t*)pt_phys;
+        serial_debug_str("pt_zero_loop_start\n");
         for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
             pt->entries[i] = 0;
         }
+        serial_debug_str("pt_zero_loop_end\n");
         serial_debug_str("after_pt_zero\n");
     } else {
+        serial_debug_str("pd_already_present\n");
         pt = (page_table_t*)pte_get_addr(*pd_entry);
     }
+    serial_debug_str("pt_walk_complete\n");
 
     // Return pointer to final PT entry
     return &pt->entries[vaddr.pt_index];
