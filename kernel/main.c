@@ -136,7 +136,11 @@ void kernel_main(boot_info_t *boot_info) {
 
     // Initialize Scheduler
     scheduler_init();
-    console_print("  [OK] Scheduler\n");
+    console_print("  [OK] Scheduler initialized\n");
+
+    // Start Scheduler
+    scheduler_start();
+    console_print("  [OK] Scheduler started\n");
 
     // Initialize System Call Interface
     syscall_init();

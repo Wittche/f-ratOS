@@ -23,6 +23,13 @@ info_request_start:
     .long 8                                 /* Request: Framebuffer info */
 info_request_end:
 
+    /* Entry Address Tag - Tell GRUB exactly where to jump */
+    .align 8
+    .short 3                                /* Type: Entry address */
+    .short 0                                /* Flags: required */
+    .long 12                                /* Size */
+    .long _start                            /* Entry point symbol */
+
     /* Framebuffer Tag (optional) */
     .align 8
     .short 5                                /* Type: Framebuffer */

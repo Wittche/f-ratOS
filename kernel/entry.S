@@ -106,10 +106,10 @@ check_long_mode:
 
 /* Setup page tables for identity mapping */
 setup_page_tables:
-    /* Clear page tables */
+    /* Clear page tables (3 tables x 4KB each = 12KB total) */
     movl $pml4_table, %edi
     movl $0, %eax
-    movl $4096, %ecx
+    movl $3072, %ecx      /* 3 * 4096 / 4 = 3072 dwords */
     rep stosl
 
     /* Setup PML4: PML4[0] -> PDPT */
@@ -175,7 +175,8 @@ gdt64_end:
 
 gdt64_pointer:
     .word gdt64_end - gdt64 - 1
-    .quad gdt64
+    .long gdt64           /* Use .long (4 bytes) for 32-bit mode lgdt */
+    .word 0               /* Padding to align if needed */
 
 /* Multiboot info pointer storage */
 .section .bss
