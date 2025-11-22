@@ -19,7 +19,9 @@ _start:
     cli
 
     /* Save Multiboot2 info */
-    movl %ebx, multiboot_info_ptr
+    /* Use absolute addressing - load address to register first */
+    movl $multiboot_info_ptr, %edi
+    movl %ebx, (%edi)
 
     /* Setup initial stack (16KB) */
     movl $stack_top, %esp
