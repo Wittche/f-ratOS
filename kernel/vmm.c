@@ -38,10 +38,10 @@ static struct {
 // These break the chicken-and-egg problem: we need page tables to set up
 // identity mapping, but we need identity mapping to access PMM-allocated page tables.
 // After initial setup with these static buffers, we can use PMM normally.
+// NOTE: We use 2MB huge pages (PD level), so NO PT arrays needed! Saves 32KB and 4096 loop iterations
 static page_table_t static_pml4 __attribute__((aligned(4096)));
 static page_table_t static_pdpt __attribute__((aligned(4096)));
 static page_table_t static_pd __attribute__((aligned(4096)));
-static page_table_t static_pt[8] __attribute__((aligned(4096))); // 8 PTs for 16MB (each PT = 2MB)
 
 // Helper macros
 #define ALIGN_DOWN(addr, align) ((addr) & ~((align) - 1))
@@ -375,8 +375,6 @@ void vmm_init(boot_info_t *boot_info) {
     for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
         static_pd.entries[i] = 0;
     }
-    // Skip zeroing PTs - we'll fill them completely with identity mapping below
-    // This avoids 4096 extra loop iterations that could cause stack issues
     serial_debug_str("static_tables_zeroed\n");
 
     // Get physical addresses of static buffers (they're in kernel .bss)
@@ -387,8 +385,8 @@ void vmm_init(boot_info_t *boot_info) {
     serial_debug_str("got_static_addrs\n");
 
     // Build identity mapping manually for first 16MB (0x0 - 0xFFFFFF)
-    // Structure: PML4[0] -> PDPT[0] -> PD[0-7] -> PT[0-7]
-    // Each PT maps 2MB (512 entries * 4KB), so 8 PTs map 16MB
+    // Using 2MB HUGE PAGES to avoid PT arrays and 4096-iteration loops!
+    // Structure: PML4[0] -> PDPT[0] -> PD[0-7] (each PD entry = 2MB huge page)
 
     // PML4[0] -> PDPT
     serial_debug_str("setup_pml4_entry\n");
@@ -398,28 +396,20 @@ void vmm_init(boot_info_t *boot_info) {
     serial_debug_str("setup_pdpt_entry\n");
     static_pdpt.entries[0] = pte_create(pd_phys, PTE_PRESENT | PTE_WRITE);
 
-    // PD[0-7] -> PT[0-7]
-    serial_debug_str("setup_pd_entries\n");
+    // PD[0-7] = 2MB huge pages (0-16MB)
+    // Each PD entry points directly to a 2MB physical region (no PT needed!)
+    serial_debug_str("setup_huge_pages\n");
     for (int i = 0; i < 8; i++) {
-        uint64_t pt_phys = (uint64_t)&static_pt[i];
-        static_pd.entries[i] = pte_create(pt_phys, PTE_PRESENT | PTE_WRITE);
+        uint64_t phys_addr = i * 2 * 1024 * 1024;  // 0MB, 2MB, 4MB, ..., 14MB
+        // PTE_HUGE flag marks this as a 2MB page (no PT needed)
+        static_pd.entries[i] = pte_create(phys_addr, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
     }
-
-    // Fill PT entries to map physical pages (identity mapping)
-    serial_debug_str("setup_pt_entries\n");
-    for (int pt_idx = 0; pt_idx < 8; pt_idx++) {
-        for (int entry = 0; entry < ENTRIES_PER_TABLE; entry++) {
-            // Calculate physical address: (pt_idx * 2MB) + (entry * 4KB)
-            uint64_t phys_addr = (pt_idx * 2 * 1024 * 1024) + (entry * PAGE_SIZE);
-            static_pt[pt_idx].entries[entry] = pte_create(phys_addr, PTE_PRESENT | PTE_WRITE);
-        }
-    }
-    serial_debug_str("identity_map_complete\n");
+    serial_debug_str("huge_pages_setup\n");
 
     // Set up VMM state
     kernel_pml4 = &static_pml4;
     vmm_state.pml4_physical = pml4_phys;
-    vmm_state.page_tables_allocated = 10; // PML4 + PDPT + PD + 8 PTs
+    vmm_state.page_tables_allocated = 3; // PML4 + PDPT + PD (no PTs!)
     vmm_state.kernel_pages = 4096; // 16MB = 4096 pages
     vmm_initialized = true;
     serial_debug_str("vmm_state_initialized\n");
