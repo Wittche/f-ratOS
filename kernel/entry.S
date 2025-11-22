@@ -58,10 +58,17 @@ _start:
     movl %eax, %cr0
 
     /* Load 64-bit GDT */
+    /* Use address-size prefix to force 32-bit absolute addressing */
+    /* This prevents assembler from using RIP-relative addressing */
+    .byte 0x67  /* Address-size override prefix */
     lgdt (gdt64_pointer)
 
     /* Jump to 64-bit code */
-    ljmp $0x08, $long_mode_start
+    /* Manual far jump encoding to avoid assembler issues */
+    /* Opcode: EA <offset:4 bytes> <selector:2 bytes> */
+    .byte 0xEA
+    .long long_mode_start
+    .word 0x08
 
 .no_long_mode:
     /* Halt if no long mode support */
