@@ -409,9 +409,23 @@ void kheap_init(boot_info_t *boot_info) {
 
     // Set heap boundaries
     serial_debug_str("setting_heap_boundaries\n");
-    heap_state.heap_start = HEAP_START_ADDR;
-    heap_state.heap_end = HEAP_START_ADDR;
-    heap_state.heap_size = 0;
+
+    // Try a volatile pointer to prevent optimization issues
+    serial_debug_str("A\n");
+    volatile uint64_t *heap_start_ptr = &heap_state.heap_start;
+    serial_debug_str("A2\n");
+    *heap_start_ptr = HEAP_START_ADDR;
+    serial_debug_str("B\n");
+
+    volatile uint64_t *heap_end_ptr = &heap_state.heap_end;
+    serial_debug_str("B2\n");
+    *heap_end_ptr = HEAP_START_ADDR;
+    serial_debug_str("C\n");
+
+    volatile uint64_t *heap_size_ptr = &heap_state.heap_size;
+    serial_debug_str("C2\n");
+    *heap_size_ptr = 0;
+    serial_debug_str("D\n");
     serial_debug_str("boundaries_set\n");
 
     // Expand initial heap
