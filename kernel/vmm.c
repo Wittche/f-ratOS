@@ -172,6 +172,12 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         // No need to zero - garbage in unused entries is safe (they're never accessed)
         pd = (page_table_t*)pd_phys;
     } else {
+        // Check if this is a huge page (1GB)
+        if (*pdpt_entry & PTE_HUGE) {
+            // Cannot get PTE for huge page - would need to split it first
+            console_print("[DEBUG] vmm_get_pte: Cannot access 1GB huge page\n");
+            return NULL;
+        }
         pd = (page_table_t*)pte_get_addr(*pdpt_entry);
     }
 
@@ -198,6 +204,12 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         //     pt->entries[i] = 0;
         // }
     } else {
+        // Check if this is a huge page (2MB)
+        if (*pd_entry & PTE_HUGE) {
+            // Cannot get PTE for huge page - would need to split it first
+            console_print("[DEBUG] vmm_get_pte: Cannot access huge page, would need to split\n");
+            return NULL;
+        }
         pt = (page_table_t*)pte_get_addr(*pd_entry);
     }
 
@@ -401,18 +413,13 @@ void vmm_init(boot_info_t *boot_info) {
         serial_debug_str("kernel_map_complete\n");
     } else {
         serial_debug_str("boot_info_invalid_test_mode\n");
-        // Test mode: Map kernel at 1MB
+        // Test mode: Kernel is at 1MB, already covered by identity mapping (0-16MB)
+        // No need to map again - avoid conflict with huge pages
         serial_debug_str("test_mode_msg_skipped\n");
-        uint64_t kernel_size = 1024 * 1024; // Assume 1MB kernel
-        serial_debug_str("before_test_map_range\n");
-        if (!vmm_map_range(KERNEL_PHYSICAL_BASE, KERNEL_PHYSICAL_BASE,
-                          kernel_size, PTE_KERNEL_FLAGS)) {
-            serial_debug_str("test_map_failed\n");
-            console_print("[VMM] ERROR: Failed to map kernel\n");
-            return;
-        }
-        serial_debug_str("after_test_map_range\n");
-        vmm_state.kernel_pages += 256; // 1MB = 256 pages
+        serial_debug_str("skipping_redundant_map\n");
+        // Already mapped by identity mapping, just update stats
+        vmm_state.kernel_pages += 256; // 1MB = 256 pages (assume 1MB kernel)
+        serial_debug_str("test_mode_complete\n");
     }
 
     // Setup recursive mapping (last PML4 entry points to itself)
