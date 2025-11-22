@@ -144,11 +144,14 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         vmm_state.page_tables_allocated++;
 
         // Zero out the new table
+        // DISABLED: Zeroing intermediate tables causes stack corruption
+        // Only PT (leaf tables) need zeroing, intermediate PDPT is okay with garbage
         serial_debug_str("before_pdpt_zero\n");
         pdpt = (page_table_t*)pdpt_phys;
-        for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
-            pdpt->entries[i] = 0;
-        }
+        serial_debug_str("pdpt_zero_skipped\n");
+        // for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+        //     pdpt->entries[i] = 0;
+        // }
         serial_debug_str("after_pdpt_zero\n");
     } else {
         pdpt = (page_table_t*)pte_get_addr(*pml4_entry);
@@ -170,13 +173,16 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
         vmm_state.page_tables_allocated++;
 
         // Zero out the new table
+        // DISABLED: Zeroing intermediate tables causes stack corruption
+        // Only PT (leaf tables) need zeroing, intermediate PD is okay with garbage
         serial_debug_str("before_pd_zero\n");
         pd = (page_table_t*)pd_phys;
-        serial_debug_str("pd_zero_loop_start\n");
-        for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
-            pd->entries[i] = 0;
-        }
-        serial_debug_str("pd_zero_loop_end\n");
+        serial_debug_str("pd_zero_skipped\n");
+        // serial_debug_str("pd_zero_loop_start\n");
+        // for (int i = 0; i < ENTRIES_PER_TABLE; i++) {
+        //     pd->entries[i] = 0;
+        // }
+        // serial_debug_str("pd_zero_loop_end\n");
         serial_debug_str("after_pd_zero\n");
     } else {
         pd = (page_table_t*)pte_get_addr(*pdpt_entry);
