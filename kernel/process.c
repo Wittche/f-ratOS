@@ -9,6 +9,7 @@
 #include "console.h"
 #include "vmm.h"
 #include "types.h"
+#include "scheduler.h"
 
 // Process/Thread ID counters
 static pid_t next_pid = 1;
@@ -191,8 +192,15 @@ thread_t* thread_create(process_t *proc, void (*entry_point)(void), uint32_t pri
     proc->thread_list = thread;
     proc->thread_count++;
 
-    // Mark as ready
+    // Mark as ready and add to scheduler
     thread->state = TASK_STATE_READY;
+    scheduler_add_thread(thread);
+
+    console_print("[PROC] Created thread TID=");
+    console_print_dec(thread->tid);
+    console_print(" for process PID=");
+    console_print_dec(proc->pid);
+    console_print("\n");
 
     return thread;
 }
