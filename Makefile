@@ -73,21 +73,20 @@ KERNEL_OBJS = $(BUILD_DIR)/multiboot.o \
               $(BUILD_DIR)/console.o \
               $(BUILD_DIR)/gdt.o \
               $(BUILD_DIR)/gdt_asm.o \
-              $(BUILD_DIR)/tss.o \
               $(BUILD_DIR)/idt.o \
               $(BUILD_DIR)/idt_asm.o \
+              $(BUILD_DIR)/timer.o \
+              $(BUILD_DIR)/keyboard.o \
               $(BUILD_DIR)/pmm.o \
               $(BUILD_DIR)/vmm.o \
               $(BUILD_DIR)/vmm_asm.o \
               $(BUILD_DIR)/kheap.o \
-              $(BUILD_DIR)/timer.o \
-              $(BUILD_DIR)/keyboard.o \
               $(BUILD_DIR)/process.o \
               $(BUILD_DIR)/scheduler.o \
               $(BUILD_DIR)/switch.o \
+              $(BUILD_DIR)/tss.o \
               $(BUILD_DIR)/syscall.o \
               $(BUILD_DIR)/syscall_asm.o \
-              $(BUILD_DIR)/kthread_test.o \
               $(BUILD_DIR)/usermode.o \
               $(BUILD_DIR)/usermode_test.o
 
@@ -134,7 +133,7 @@ $(BUILD_DIR)/entry.o: $(KERNEL_DIR)/entry.S | $(BUILD_DIR)
 	@echo "[AS] Assembling kernel entry..."
 	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
 
-$(BUILD_DIR)/main.o: $(KERNEL_DIR)/main.c $(KERNEL_DIR)/types.h $(KERNEL_DIR)/boot.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
+$(BUILD_DIR)/main.o: $(KERNEL_DIR)/main.c $(KERNEL_DIR)/types.h $(KERNEL_DIR)/boot.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/gdt.h $(KERNEL_DIR)/idt.h $(KERNEL_DIR)/pmm.h $(KERNEL_DIR)/vmm.h $(KERNEL_DIR)/kheap.h $(KERNEL_DIR)/timer.h $(KERNEL_DIR)/keyboard.h $(KERNEL_DIR)/process.h $(KERNEL_DIR)/scheduler.h $(KERNEL_DIR)/syscall.h $(KERNEL_DIR)/tss.h $(KERNEL_DIR)/usermode.h | $(BUILD_DIR)
 	@echo "[CC] Compiling kernel main..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
@@ -147,26 +146,30 @@ $(BUILD_DIR)/gdt.o: $(KERNEL_DIR)/gdt.c $(KERNEL_DIR)/gdt.h $(KERNEL_DIR)/types.
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
 $(BUILD_DIR)/gdt_asm.o: $(KERNEL_DIR)/gdt_asm.S | $(BUILD_DIR)
-	@echo "[AS] Assembling GDT loader..."
+	@echo "[AS] Assembling GDT functions..."
 	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
 
-$(BUILD_DIR)/tss.o: $(KERNEL_DIR)/tss.c $(KERNEL_DIR)/tss.h $(KERNEL_DIR)/gdt.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/types.h | $(BUILD_DIR)
-	@echo "[CC] Compiling TSS..."
-	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
-
-$(BUILD_DIR)/idt.o: $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/idt.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/io.h $(KERNEL_DIR)/timer.h $(KERNEL_DIR)/keyboard.h | $(BUILD_DIR)
+$(BUILD_DIR)/idt.o: $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/idt.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
 	@echo "[CC] Compiling IDT..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
 $(BUILD_DIR)/idt_asm.o: $(KERNEL_DIR)/idt_asm.S | $(BUILD_DIR)
-	@echo "[AS] Assembling IDT stubs..."
+	@echo "[AS] Assembling IDT functions..."
 	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
 
-$(BUILD_DIR)/pmm.o: $(KERNEL_DIR)/pmm.c $(KERNEL_DIR)/pmm.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/boot.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
+$(BUILD_DIR)/timer.o: $(KERNEL_DIR)/timer.c $(KERNEL_DIR)/timer.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/io.h | $(BUILD_DIR)
+	@echo "[CC] Compiling timer..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/keyboard.o: $(KERNEL_DIR)/keyboard.c $(KERNEL_DIR)/keyboard.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/io.h | $(BUILD_DIR)
+	@echo "[CC] Compiling keyboard..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/pmm.o: $(KERNEL_DIR)/pmm.c $(KERNEL_DIR)/pmm.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
 	@echo "[CC] Compiling PMM..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
-$(BUILD_DIR)/vmm.o: $(KERNEL_DIR)/vmm.c $(KERNEL_DIR)/vmm.h $(KERNEL_DIR)/pmm.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/boot.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
+$(BUILD_DIR)/vmm.o: $(KERNEL_DIR)/vmm.c $(KERNEL_DIR)/vmm.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
 	@echo "[CC] Compiling VMM..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
@@ -174,23 +177,15 @@ $(BUILD_DIR)/vmm_asm.o: $(KERNEL_DIR)/vmm_asm.S | $(BUILD_DIR)
 	@echo "[AS] Assembling VMM functions..."
 	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
 
-$(BUILD_DIR)/kheap.o: $(KERNEL_DIR)/kheap.c $(KERNEL_DIR)/kheap.h $(KERNEL_DIR)/pmm.h $(KERNEL_DIR)/vmm.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
+$(BUILD_DIR)/kheap.o: $(KERNEL_DIR)/kheap.c $(KERNEL_DIR)/kheap.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
 	@echo "[CC] Compiling kernel heap..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
-$(BUILD_DIR)/timer.o: $(KERNEL_DIR)/timer.c $(KERNEL_DIR)/timer.h $(KERNEL_DIR)/io.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/scheduler.h | $(BUILD_DIR)
-	@echo "[CC] Compiling timer driver..."
-	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
-
-$(BUILD_DIR)/keyboard.o: $(KERNEL_DIR)/keyboard.c $(KERNEL_DIR)/keyboard.h $(KERNEL_DIR)/io.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
-	@echo "[CC] Compiling keyboard driver..."
-	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
-
-$(BUILD_DIR)/process.o: $(KERNEL_DIR)/process.c $(KERNEL_DIR)/process.h $(KERNEL_DIR)/kheap.h $(KERNEL_DIR)/vmm.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
+$(BUILD_DIR)/process.o: $(KERNEL_DIR)/process.c $(KERNEL_DIR)/process.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
 	@echo "[CC] Compiling process management..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
-$(BUILD_DIR)/scheduler.o: $(KERNEL_DIR)/scheduler.c $(KERNEL_DIR)/scheduler.h $(KERNEL_DIR)/process.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
+$(BUILD_DIR)/scheduler.o: $(KERNEL_DIR)/scheduler.c $(KERNEL_DIR)/scheduler.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
 	@echo "[CC] Compiling scheduler..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
@@ -198,58 +193,76 @@ $(BUILD_DIR)/switch.o: $(KERNEL_DIR)/switch.S | $(BUILD_DIR)
 	@echo "[AS] Assembling context switch..."
 	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
 
-$(BUILD_DIR)/syscall.o: $(KERNEL_DIR)/syscall.c $(KERNEL_DIR)/syscall.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/process.h $(KERNEL_DIR)/scheduler.h $(KERNEL_DIR)/timer.h $(KERNEL_DIR)/types.h | $(BUILD_DIR)
-	@echo "[CC] Compiling system call interface..."
+$(BUILD_DIR)/tss.o: $(KERNEL_DIR)/tss.c $(KERNEL_DIR)/tss.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/gdt.h | $(BUILD_DIR)
+	@echo "[CC] Compiling TSS..."
+	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/syscall.o: $(KERNEL_DIR)/syscall.c $(KERNEL_DIR)/syscall.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
+	@echo "[CC] Compiling syscalls..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
 $(BUILD_DIR)/syscall_asm.o: $(KERNEL_DIR)/syscall_asm.S | $(BUILD_DIR)
-	@echo "[AS] Assembling system call entry..."
+	@echo "[AS] Assembling syscall handler..."
 	$(AS) $(KERNEL_AS_FLAGS) $< -o $@
 
-$(BUILD_DIR)/kthread_test.o: $(KERNEL_DIR)/kthread_test.c $(KERNEL_DIR)/kthread_test.h $(KERNEL_DIR)/process.h $(KERNEL_DIR)/scheduler.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/timer.h $(KERNEL_DIR)/types.h | $(BUILD_DIR)
-	@echo "[CC] Compiling kernel thread tests..."
-	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
-
-$(BUILD_DIR)/usermode.o: $(KERNEL_DIR)/usermode.c $(KERNEL_DIR)/usermode.h $(KERNEL_DIR)/tss.h $(KERNEL_DIR)/gdt.h $(KERNEL_DIR)/kheap.h $(KERNEL_DIR)/console.h $(KERNEL_DIR)/types.h | $(BUILD_DIR)
+$(BUILD_DIR)/usermode.o: $(KERNEL_DIR)/usermode.c $(KERNEL_DIR)/usermode.h $(KERNEL_DIR)/types.h $(KERNEL_DIR)/console.h | $(BUILD_DIR)
 	@echo "[CC] Compiling user mode support..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
-$(BUILD_DIR)/usermode_test.o: $(KERNEL_DIR)/usermode_test.c $(KERNEL_DIR)/syscall.h $(KERNEL_DIR)/types.h | $(BUILD_DIR)
-	@echo "[CC] Compiling user mode test program..."
+$(BUILD_DIR)/usermode_test.o: $(KERNEL_DIR)/usermode_test.c $(KERNEL_DIR)/types.h $(KERNEL_DIR)/syscall.h | $(BUILD_DIR)
+	@echo "[CC] Compiling user mode test..."
 	$(KERNEL_CC) $(KERNEL_CC_FLAGS) -c $< -o $@
 
 # Create kernel linker script
 $(KERNEL_DIR)/linker.ld:
 	@echo "Creating kernel linker script..."
-	@echo "OUTPUT_FORMAT(elf64-x86-64)" > $@
+	@echo "/* AuroraOS Kernel Linker Script" > $@
+	@echo " * For Multiboot2 64-bit kernel" >> $@
+	@echo " * Kernel loaded at 1MB (0x100000) physical address" >> $@
+	@echo " */" >> $@
+	@echo "OUTPUT_FORMAT(elf64-x86-64)" >> $@
 	@echo "ENTRY(_start)" >> $@
 	@echo "" >> $@
 	@echo "SECTIONS" >> $@
 	@echo "{" >> $@
+	@echo "    /* Kernel starts at 1MB physical address */" >> $@
 	@echo "    . = 0x100000;" >> $@
 	@echo "" >> $@
-	@echo "    .text : {" >> $@
+	@echo "    /* Multiboot2 header MUST be at the start */" >> $@
+	@echo "    .boot ALIGN(8) :" >> $@
+	@echo "    {" >> $@
 	@echo "        *(.multiboot)" >> $@
 	@echo "        *(.text)" >> $@
 	@echo "    }" >> $@
 	@echo "" >> $@
-	@echo "    .rodata : {" >> $@
+	@echo "    /* Read-only data - 4KB aligned */" >> $@
+	@echo "    .rodata ALIGN(4K) :" >> $@
+	@echo "    {" >> $@
 	@echo "        *(.rodata*)" >> $@
 	@echo "    }" >> $@
 	@echo "" >> $@
-	@echo "    .data : {" >> $@
+	@echo "    /* Initialized data - 4KB aligned */" >> $@
+	@echo "    .data ALIGN(4K) :" >> $@
+	@echo "    {" >> $@
 	@echo "        *(.data)" >> $@
 	@echo "    }" >> $@
 	@echo "" >> $@
-	@echo "    .bss : {" >> $@
+	@echo "    /* Uninitialized data (BSS) - 4KB aligned */" >> $@
+	@echo "    .bss ALIGN(4K) :" >> $@
+	@echo "    {" >> $@
 	@echo "        *(.bss)" >> $@
 	@echo "        *(COMMON)" >> $@
 	@echo "    }" >> $@
 	@echo "" >> $@
+	@echo "    /* Discard debug and unneeded sections */" >> $@
 	@echo "    /DISCARD/ : {" >> $@
 	@echo "        *(.eh_frame)" >> $@
+	@echo "        *(.eh_frame_hdr)" >> $@
+	@echo "        *(.note.GNU-stack)" >> $@
 	@echo "        *(.comment)" >> $@
 	@echo "    }" >> $@
+	@echo "" >> $@
+	@echo "    _kernel_end = .;" >> $@
 	@echo "}" >> $@
 
 # Create bootable ISO (future)
@@ -284,28 +297,6 @@ run-bios: $(KERNEL_ELF)
 		-m 256M \
 		-serial stdio
 
-# Quick test - Build and run in one command
-.PHONY: test
-test: all
-	@echo ""
-	@echo "=========================================="
-	@echo "  Quick Test - Running AuroraOS Kernel"
-	@echo "=========================================="
-	@echo ""
-	@echo "Build Summary:"
-	@echo "  Bootloader: $$(ls -lh $(BOOTLOADER_EFI) | awk '{print $$5}')"
-	@echo "  Kernel:     $$(ls -lh $(KERNEL_BIN) | awk '{print $$5}')"
-	@echo ""
-	@echo "Starting QEMU..."
-	@echo "Press Ctrl+C to exit"
-	@echo ""
-	@qemu-system-x86_64 \
-		-kernel $(KERNEL_ELF) \
-		-m 256M \
-		-serial stdio \
-		-display curses \
-		2>&1 || (echo ""; echo "ERROR: QEMU not found!"; echo "Install: sudo apt-get install qemu-system-x86"; false)
-
 # Clean build artifacts
 .PHONY: clean
 clean:
@@ -316,38 +307,20 @@ clean:
 # Help
 .PHONY: help
 help:
-	@echo "=========================================="
-	@echo "      AuroraOS Build System v0.1"
-	@echo "=========================================="
+	@echo "AuroraOS Build System"
 	@echo ""
-	@echo "Build Targets:"
+	@echo "Targets:"
 	@echo "  all        - Build bootloader and kernel (default)"
 	@echo "  kernel     - Build kernel only"
-	@echo "  clean      - Remove all build artifacts"
-	@echo ""
-	@echo "Test Targets:"
-	@echo "  test       - Build everything and run quick test (recommended)"
-	@echo "  run-bios   - Run kernel with legacy Multiboot (simple test)"
-	@echo "  run        - Run with UEFI bootloader (requires OVMF)"
-	@echo ""
-	@echo "Advanced Targets:"
 	@echo "  esp        - Create ESP (EFI System Partition) image"
-	@echo "  iso        - Create bootable ISO (not yet implemented)"
-	@echo ""
-	@echo "Quick Start:"
-	@echo "  make test  - Build and test in one command!"
+	@echo "  clean      - Remove build artifacts"
+	@echo "  run        - Run in QEMU with UEFI (auto-creates ESP)"
+	@echo "  run-bios   - Run in QEMU with legacy BIOS (Multiboot test)"
+	@echo "  iso        - Create bootable ISO (not implemented)"
+	@echo "  help       - Show this help"
 	@echo ""
 	@echo "Requirements:"
-	@echo "  Build:  GCC, Clang, GNU Binutils (as, ld, objcopy)"
-	@echo "  Test:   qemu-system-x86 (install: apt install qemu-system-x86)"
-	@echo "  UEFI:   OVMF firmware (optional, for full UEFI boot)"
-	@echo ""
-	@echo "Project Status:"
-	@echo "  ✅ UEFI Bootloader (boot_simple.c)"
-	@echo "  ✅ Kernel Entry (entry.S)"
-	@echo "  ✅ VGA Console (console.c)"
-	@echo "  ✅ GDT (Global Descriptor Table)"
-	@echo "  ✅ IDT (Interrupt Descriptor Table)"
-	@echo "  ✅ PIC (8259 Interrupt Controller)"
-	@echo "  ⏳ PMM (Physical Memory Manager)"
-	@echo "  ⏳ VMM (Virtual Memory Manager)"
+	@echo "  - GCC/Clang with x86_64 target"
+	@echo "  - NASM assembler"
+	@echo "  - QEMU for testing"
+	@echo "  - OVMF UEFI firmware for UEFI testing"
