@@ -34,6 +34,12 @@ _start:
     or $0x20, %eax
     mov %eax, %cr4
 
+    /* Clear page tables first (safety) */
+    mov $pml4, %edi
+    mov $12288, %ecx  /* 3 * 4096 bytes to clear */
+    xor %eax, %eax
+    rep stosb
+
     /* Setup page tables for identity mapping */
     /* PML4[0] -> PDPT */
     mov $pdpt, %eax
@@ -45,9 +51,15 @@ _start:
     or $0x3, %eax
     mov %eax, pdpt
 
-    /* PD[0] = 2MB page at 0x0 */
+    /* Map first 16MB with 2MB pages (8 entries) */
+    mov $pd, %edi
     mov $0x83, %eax  /* Present + Writable + Huge Page */
-    mov %eax, pd
+    mov $8, %ecx     /* 8 entries = 16MB */
+.map_loop:
+    mov %eax, (%edi)
+    add $0x200000, %eax  /* Next 2MB */
+    add $8, %edi         /* Next PD entry */
+    loop .map_loop
 
     /* Load PML4 address into CR3 */
     mov $pml4, %eax
