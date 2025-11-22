@@ -8,6 +8,10 @@ build/
 *.efi
 *.EFI
 
+# QEMU logs
+logs/*.log
+*.log
+
 # Linker script (auto-generated)
 kernel/linker.ld
 

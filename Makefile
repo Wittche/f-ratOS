@@ -13,6 +13,7 @@ BUILD_DIR = build
 BOOT_DIR = bootloader/efi
 KERNEL_DIR = kernel
 ISO_DIR = $(BUILD_DIR)/iso
+LOG_DIR = logs
 
 # Target architecture
 ARCH = x86_64
@@ -278,7 +279,17 @@ iso: $(KERNEL_ELF)
 .PHONY: run-iso
 run-iso: iso
 	@echo "Running AuroraOS ISO in QEMU..."
-	qemu-system-x86_64 -cdrom $(BUILD_DIR)/auroraos.iso -m 256M -serial stdio
+	@mkdir -p $(LOG_DIR)
+	@TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
+	LOG_FILE="$(LOG_DIR)/qemu_iso_$$TIMESTAMP.log"; \
+	echo "Log file: $$LOG_FILE"; \
+	qemu-system-x86_64 \
+		-cdrom $(BUILD_DIR)/auroraos.iso \
+		-m 256M \
+		-serial file:$$LOG_FILE \
+		-monitor stdio \
+		-d guest_errors,cpu_reset \
+		-D $(LOG_DIR)/qemu_debug_$$TIMESTAMP.log
 
 # Create ESP (EFI System Partition) image
 .PHONY: esp
@@ -291,21 +302,35 @@ esp: $(BOOTLOADER_EFI) $(KERNEL_BIN)
 run: esp
 	@echo "Running AuroraOS in QEMU (UEFI mode)..."
 	@echo "Note: Requires OVMF UEFI firmware"
+	@mkdir -p $(LOG_DIR)
+	@TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
+	LOG_FILE="$(LOG_DIR)/qemu_uefi_$$TIMESTAMP.log"; \
+	echo "Log file: $$LOG_FILE"; \
 	qemu-system-x86_64 \
 		-bios /usr/share/ovmf/OVMF.fd \
 		-drive format=raw,file=$(BUILD_DIR)/esp.img \
 		-m 256M \
-		-serial stdio
+		-serial file:$$LOG_FILE \
+		-monitor stdio \
+		-d guest_errors,cpu_reset \
+		-D $(LOG_DIR)/qemu_debug_$$TIMESTAMP.log
 
 # Run with QEMU (use ELF format - simpler for testing)
 .PHONY: run-bios
 run-bios: $(KERNEL_ELF)
 	@echo "Running kernel in QEMU (direct ELF load for testing)..."
 	@echo "Note: This is a basic test - kernel expects boot_info but gets multiboot info"
+	@mkdir -p $(LOG_DIR)
+	@TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
+	LOG_FILE="$(LOG_DIR)/qemu_bios_$$TIMESTAMP.log"; \
+	echo "Log file: $$LOG_FILE"; \
 	qemu-system-x86_64 \
 		-kernel $(KERNEL_ELF) \
 		-m 256M \
-		-serial stdio
+		-serial file:$$LOG_FILE \
+		-monitor stdio \
+		-d guest_errors,cpu_reset \
+		-D $(LOG_DIR)/qemu_debug_$$TIMESTAMP.log
 
 # Clean build artifacts
 .PHONY: clean
@@ -313,6 +338,12 @@ clean:
 	@echo "Cleaning build directory..."
 	rm -rf $(BUILD_DIR)
 	rm -f $(KERNEL_DIR)/linker.ld
+
+# Clean log files
+.PHONY: clean-logs
+clean-logs:
+	@echo "Cleaning log directory..."
+	rm -rf $(LOG_DIR)
 
 # Help
 .PHONY: help
@@ -323,11 +354,12 @@ help:
 	@echo "  all        - Build bootloader and kernel (default)"
 	@echo "  kernel     - Build kernel only"
 	@echo "  iso        - Create bootable ISO with GRUB"
-	@echo "  run-iso    - Build ISO and run in QEMU"
+	@echo "  run-iso    - Build ISO and run in QEMU (logs to logs/ directory)"
 	@echo "  esp        - Create ESP (EFI System Partition) image"
-	@echo "  run        - Run in QEMU with UEFI (auto-creates ESP)"
-	@echo "  run-bios   - Run in QEMU with legacy BIOS (Multiboot test)"
+	@echo "  run        - Run in QEMU with UEFI (logs to logs/ directory)"
+	@echo "  run-bios   - Run in QEMU with legacy BIOS (logs to logs/ directory)"
 	@echo "  clean      - Remove build artifacts"
+	@echo "  clean-logs - Remove all log files"
 	@echo "  help       - Show this help"
 	@echo ""
 	@echo "Requirements:"
