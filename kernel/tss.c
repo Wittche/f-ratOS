@@ -11,7 +11,8 @@
 #include "io.h"
 
 // Global TSS (one per CPU, we only have one CPU for now)
-static tss_t kernel_tss;
+// Initialize to zero at compile time to avoid runtime loop
+static tss_t kernel_tss = {0};
 
 // Serial debug helper (COM1 = 0x3F8)
 static inline void serial_debug_char(char c) {
@@ -82,32 +83,18 @@ void tss_init(void) {
     console_print("[TSS] Initializing Task State Segment...\n");
     serial_debug_str("after_tss_console_print\n");
 
-    // Clear TSS structure
-    serial_debug_str("before_tss_clear\n");
-    for (uint32_t i = 0; i < sizeof(tss_t); i++) {
-        ((uint8_t*)&kernel_tss)[i] = 0;
-    }
-    serial_debug_str("after_tss_clear\n");
+    // TSS structure already initialized to zero at compile time
+    // No need for runtime clearing loop
 
     // Set I/O map base to end of TSS (no I/O bitmap)
     serial_debug_str("setting_iomap\n");
     kernel_tss.iomap_base = sizeof(tss_t);
+    serial_debug_str("after_iomap\n");
 
+    // RSP0 and IST entries are already zero (compile-time initialization)
     // RSP0 will be set when creating threads
-    // For now, set it to NULL (will be updated per-thread)
-    serial_debug_str("setting_rsp0\n");
-    kernel_tss.rsp0 = 0;
-
-    // IST entries are NULL for now (no special interrupt stacks)
-    serial_debug_str("setting_ist\n");
-    kernel_tss.ist1 = 0;
-    kernel_tss.ist2 = 0;
-    kernel_tss.ist3 = 0;
-    kernel_tss.ist4 = 0;
-    kernel_tss.ist5 = 0;
-    kernel_tss.ist6 = 0;
-    kernel_tss.ist7 = 0;
-    serial_debug_str("after_ist\n");
+    // IST entries will remain NULL for now (no special interrupt stacks)
+    serial_debug_str("tss_fields_ok\n");
 
     // Add TSS descriptor to GDT
     // TSS takes 2 GDT entries (16 bytes) in 64-bit mode
