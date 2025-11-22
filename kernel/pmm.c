@@ -6,6 +6,18 @@
 
 #include "pmm.h"
 #include "console.h"
+#include "io.h"
+
+// Serial debug helper (COM1 = 0x3F8)
+static inline void serial_debug_char(char c) {
+    outb(0x3F8, c);
+}
+
+static inline void serial_debug_str(const char *s) {
+    while (*s) {
+        serial_debug_char(*s++);
+    }
+}
 
 // Bitmap to track page allocation (1 = allocated, 0 = free)
 // Each bit represents one 4KB page
@@ -41,41 +53,60 @@ static inline bool bitmap_test(uint64_t bit) {
  * Initialize PMM with boot memory map
  */
 void pmm_init(boot_info_t *boot_info) {
+    serial_debug_str("pmm_init_start\n");
     console_print("[PMM] Initializing Physical Memory Manager...\n");
+    serial_debug_str("after_pmm_console_print\n");
 
     // Clear bitmap (all pages initially marked as allocated)
+    // WARNING: This is a 1MB loop that might crash like TSS did!
+    serial_debug_str("before_bitmap_clear\n");
     for (uint64_t i = 0; i < BITMAP_SIZE; i++) {
         page_bitmap[i] = 0xFF;
     }
+    serial_debug_str("after_bitmap_clear\n");
 
+    serial_debug_str("clearing_pmm_state\n");
     pmm_state.total_pages = 0;
     pmm_state.free_pages = 0;
     pmm_state.used_pages = 0;
     pmm_state.highest_page = 0;
+    serial_debug_str("after_pmm_state\n");
 
     // Check if we have boot info
+    serial_debug_str("checking_boot_info\n");
     if (!boot_info || !boot_info->memory_map || boot_info->memory_map_size == 0) {
+        serial_debug_str("boot_info_null_path\n");
         console_print("[PMM] WARNING: No memory map available\n");
+        serial_debug_str("after_warning\n");
         console_print("[PMM] Using default 16MB memory assumption\n");
+        serial_debug_str("after_default_msg\n");
 
         // Default: Mark first 16MB as available (except first 1MB)
+        serial_debug_str("calc_default_pages\n");
         uint64_t default_pages = (16 * 1024 * 1024) / PAGE_SIZE;  // 16MB = 4096 pages
         uint64_t reserved_pages = (1 * 1024 * 1024) / PAGE_SIZE;  // First 1MB reserved
 
+        serial_debug_str("set_total_pages\n");
         pmm_state.total_pages = default_pages;
         pmm_state.highest_page = default_pages;
 
         // Mark pages 256-4095 as free (1MB-16MB)
+        serial_debug_str("before_mark_free\n");
         for (uint64_t i = reserved_pages; i < default_pages; i++) {
             bitmap_clear(i);
             pmm_state.free_pages++;
         }
+        serial_debug_str("after_mark_free\n");
 
+        serial_debug_str("calc_used_pages\n");
         pmm_state.used_pages = pmm_state.total_pages - pmm_state.free_pages;
         pmm_state.initialized = true;
 
+        serial_debug_str("before_init_msg\n");
         console_print("[PMM] Initialized with default memory layout\n");
+        serial_debug_str("before_print_stats\n");
         pmm_print_stats();
+        serial_debug_str("pmm_init_done\n");
         return;
     }
 
