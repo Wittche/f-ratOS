@@ -72,7 +72,15 @@ void console_init(void *framebuffer, uint32_t width, uint32_t height, uint32_t p
 
     console.row = 0;
     console.col = 0;
-    console.color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    console.color = vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);  // Beyaz yazı
+
+    // Immediate test - write directly to VGA memory to verify it works
+    if (console.is_vga) {
+        volatile uint16_t *vga = (volatile uint16_t*)VGA_MEMORY;
+        vga[0] = vga_entry('O', console.color);
+        vga[1] = vga_entry('K', console.color);
+        vga[2] = vga_entry('!', console.color);
+    }
 }
 
 // Clear console
