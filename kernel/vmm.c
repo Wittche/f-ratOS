@@ -390,11 +390,24 @@ void vmm_init(boot_info_t *boot_info) {
     // PD[0-7] = 2MB huge pages (0-16MB)
     // Each PD entry points directly to a 2MB physical region (no PT needed!)
     serial_debug_str("setup_huge_pages\n");
-    for (int i = 0; i < 8; i++) {
-        uint64_t phys_addr = i * 2 * 1024 * 1024;  // 0MB, 2MB, 4MB, ..., 14MB
-        // PTE_HUGE flag marks this as a 2MB page (no PT needed)
-        static_pd.entries[i] = pte_create(phys_addr, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
-    }
+
+    // Unroll loop manually to debug which write fails
+    serial_debug_str("hp0\n");
+    static_pd.entries[0] = pte_create(0 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
+    serial_debug_str("hp1\n");
+    static_pd.entries[1] = pte_create(1 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
+    serial_debug_str("hp2\n");
+    static_pd.entries[2] = pte_create(2 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
+    serial_debug_str("hp3\n");
+    static_pd.entries[3] = pte_create(3 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
+    serial_debug_str("hp4\n");
+    static_pd.entries[4] = pte_create(4 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
+    serial_debug_str("hp5\n");
+    static_pd.entries[5] = pte_create(5 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
+    serial_debug_str("hp6\n");
+    static_pd.entries[6] = pte_create(6 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
+    serial_debug_str("hp7\n");
+    static_pd.entries[7] = pte_create(7 * 2 * 1024 * 1024, PTE_PRESENT | PTE_WRITE | PTE_HUGE);
     serial_debug_str("huge_pages_setup\n");
 
     // Set up VMM state
