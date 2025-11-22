@@ -23,7 +23,9 @@ static inline void serial_debug_str(const char *s) {
 // Each bit represents one 4KB page
 // 1MB bitmap = supports up to 32GB RAM (1MB * 8 bits * 4KB)
 #define BITMAP_SIZE (1024 * 1024)  // 1MB
-static uint8_t page_bitmap[BITMAP_SIZE];
+// Initialize all pages as allocated (0xFF) at compile time to avoid runtime loop
+// Using GCC designated initializer extension
+static uint8_t page_bitmap[BITMAP_SIZE] = {[0 ... (BITMAP_SIZE-1)] = 0xFF};
 
 // PMM state
 static struct {
@@ -57,13 +59,9 @@ void pmm_init(boot_info_t *boot_info) {
     console_print("[PMM] Initializing Physical Memory Manager...\n");
     serial_debug_str("after_pmm_console_print\n");
 
-    // Clear bitmap (all pages initially marked as allocated)
-    // WARNING: This is a 1MB loop that might crash like TSS did!
-    serial_debug_str("before_bitmap_clear\n");
-    for (uint64_t i = 0; i < BITMAP_SIZE; i++) {
-        page_bitmap[i] = 0xFF;
-    }
-    serial_debug_str("after_bitmap_clear\n");
+    // Bitmap already initialized to 0xFF at compile time
+    // No need for runtime clearing loop
+    serial_debug_str("bitmap_already_init\n");
 
     serial_debug_str("clearing_pmm_state\n");
     pmm_state.total_pages = 0;
