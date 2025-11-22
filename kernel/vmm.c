@@ -328,11 +328,17 @@ void vmm_init(boot_info_t *boot_info) {
 
     // Set up VMM state - boot tables are already configured correctly
     serial_debug_str("set_vmm_state\n");
+    serial_debug_str("A\n");
     kernel_pml4 = &pml4_table;
+    serial_debug_str("B\n");
     vmm_state.pml4_physical = pml4_phys;
+    serial_debug_str("C\n");
     vmm_state.page_tables_allocated = 3; // PML4 + PDPT + PD
+    serial_debug_str("D\n");
     vmm_state.kernel_pages = 512 * 512; // 1GB = 262144 pages
+    serial_debug_str("E\n");
     vmm_initialized = true;
+    serial_debug_str("F\n");
     serial_debug_str("vmm_state_ready\n");
 
     console_print("[VMM] Using boot page tables (1GB identity mapping)\n");
