@@ -18,10 +18,20 @@ _start:
     /* Disable interrupts */
     cli
 
+    /* DEBUG: Write 'A' to VGA (we reached _start) */
+    movl $0xB8000, %edi
+    movb $'A', (%edi)
+    movb $0x0F, 1(%edi)
+
     /* Save Multiboot2 info */
     /* Use absolute addressing - load address to register first */
     movl $multiboot_info_ptr, %edi
     movl %ebx, (%edi)
+
+    /* DEBUG: Write 'B' to VGA (saved multiboot info) */
+    movl $0xB8000, %edi
+    movb $'B', 2(%edi)
+    movb $0x0F, 3(%edi)
 
     /* Setup initial stack (16KB) */
     movl $stack_top, %esp
@@ -31,13 +41,28 @@ _start:
     pushl $0
     popf
 
+    /* DEBUG: Write 'C' to VGA (about to check long mode) */
+    movl $0xB8000, %edi
+    movb $'C', 4(%edi)
+    movb $0x0F, 5(%edi)
+
     /* Check for long mode support */
     call check_long_mode
     testl %eax, %eax
     jz .no_long_mode
 
+    /* DEBUG: Write 'D' to VGA (long mode supported) */
+    movl $0xB8000, %edi
+    movb $'D', 6(%edi)
+    movb $0x0F, 7(%edi)
+
     /* Setup paging for long mode */
     call setup_page_tables
+
+    /* DEBUG: Write 'E' to VGA (page tables setup) */
+    movl $0xB8000, %edi
+    movb $'E', 8(%edi)
+    movb $0x0F, 9(%edi)
 
     /* Enable PAE (Physical Address Extension) */
     movl %cr4, %eax
@@ -54,15 +79,30 @@ _start:
     orl $0x100, %eax      /* Set LM bit */
     wrmsr
 
+    /* DEBUG: Write 'F' to VGA (about to enable paging) */
+    movl $0xB8000, %edi
+    movb $'F', 10(%edi)
+    movb $0x0F, 11(%edi)
+
     /* Enable paging and protected mode */
     movl %cr0, %eax
     orl $0x80000001, %eax /* Set PG and PE bits */
     movl %eax, %cr0
 
+    /* DEBUG: Write 'G' to VGA (paging enabled) */
+    movl $0xB8000, %edi
+    movb $'G', 12(%edi)
+    movb $0x0F, 13(%edi)
+
     /* Load 64-bit GDT */
     /* Load address into register first, then use register-indirect addressing */
     movl $gdt64_pointer, %eax
     lgdt (%eax)
+
+    /* DEBUG: Write 'H' to VGA (GDT loaded) */
+    movl $0xB8000, %edi
+    movb $'H', 14(%edi)
+    movb $0x0F, 15(%edi)
 
     /* Jump to 64-bit code */
     /* Manual far jump encoding to avoid assembler issues */
@@ -147,6 +187,11 @@ setup_page_tables:
 /* 64-bit code */
 .code64
 long_mode_start:
+    /* DEBUG: Write 'I' to VGA (in 64-bit mode!) */
+    movq $0xB8000, %rdi
+    movb $'I', 16(%rdi)
+    movb $0x0F, 17(%rdi)
+
     /* Load 64-bit data segment */
     movw $0x10, %ax
     movw %ax, %ds
@@ -155,13 +200,29 @@ long_mode_start:
     movw %ax, %gs
     movw %ax, %ss
 
+    /* DEBUG: Write 'J' to VGA (segments loaded) */
+    movq $0xB8000, %rdi
+    movb $'J', 18(%rdi)
+    movb $0x0F, 19(%rdi)
+
     /* Setup 64-bit stack */
     movq $stack_top, %rsp
     xorq %rbp, %rbp
 
+    /* DEBUG: Write 'K' to VGA (stack ready) */
+    movq $0xB8000, %rdi
+    movb $'K', 20(%rdi)
+    movb $0x0F, 21(%rdi)
+
     /* Prepare argument for kernel_main */
     /* RDI = boot_info pointer (NULL for now, we'll parse Multiboot2 later) */
     xorq %rdi, %rdi
+
+    /* DEBUG: Write 'L' to VGA (calling kernel_main) */
+    movq $0xB8000, %rdi
+    movb $'L', 22(%rdi)
+    movb $0x0F, 23(%rdi)
+    xorq %rdi, %rdi  /* restore RDI */
 
     /* Call kernel main */
     call kernel_main
