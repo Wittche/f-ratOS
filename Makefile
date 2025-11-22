@@ -45,6 +45,10 @@ KERNEL_CC_FLAGS = -ffreestanding \
                   -fno-pic \
                   -fno-pie \
                   -mno-red-zone \
+                  -mno-sse \
+                  -mno-sse2 \
+                  -mno-mmx \
+                  -mno-80387 \
                   -mcmodel=kernel \
                   -m64 \
                   -std=c11 \
