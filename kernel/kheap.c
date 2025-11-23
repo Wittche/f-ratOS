@@ -179,6 +179,7 @@ void kheap_expand(uint64_t size) {
     uint64_t num_pages = size / PAGE_SIZE;
     serial_debug_str("calc_pages\n");
 
+    serial_debug_str("loop_start\n");
     for (uint64_t i = 0; i < num_pages; i++) {
         uint64_t phys = pmm_alloc_frame();
         if (phys == 0) {
