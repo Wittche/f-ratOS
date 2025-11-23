@@ -161,21 +161,28 @@ void kheap_coalesce(void) {
  * Expand heap by allocating more pages
  */
 void kheap_expand(uint64_t size) {
+    serial_debug_str("expand_enter\n");
+
     // Align size to page boundary
     size = ALIGN_UP(size, PAGE_SIZE);
+    serial_debug_str("aligned\n");
 
     // Check max heap size
     if (heap_state.heap_size + size > HEAP_MAX_SIZE) {
+        serial_debug_str("max_size_reached\n");
         console_print("[HEAP] WARNING: Max heap size reached\n");
         return;
     }
+    serial_debug_str("size_ok\n");
 
     // Allocate physical pages
     uint64_t num_pages = size / PAGE_SIZE;
+    serial_debug_str("calc_pages\n");
 
+    serial_debug_str("loop_start\n");
     for (uint64_t i = 0; i < num_pages; i++) {
-        // Progress indicator every 64 pages
-        if (i % 64 == 0) {
+        // Progress every 16 pages
+        if (i % 16 == 0) {
             serial_debug_char('.');
         }
 
@@ -409,9 +416,23 @@ void kheap_init(boot_info_t *boot_info) {
 
     // Set heap boundaries
     serial_debug_str("setting_heap_boundaries\n");
-    heap_state.heap_start = HEAP_START_ADDR;
-    heap_state.heap_end = HEAP_START_ADDR;
-    heap_state.heap_size = 0;
+
+    // Try a volatile pointer to prevent optimization issues
+    serial_debug_str("A\n");
+    volatile uint64_t *heap_start_ptr = &heap_state.heap_start;
+    serial_debug_str("A2\n");
+    *heap_start_ptr = HEAP_START_ADDR;
+    serial_debug_str("B\n");
+
+    volatile uint64_t *heap_end_ptr = &heap_state.heap_end;
+    serial_debug_str("B2\n");
+    *heap_end_ptr = HEAP_START_ADDR;
+    serial_debug_str("C\n");
+
+    volatile uint64_t *heap_size_ptr = &heap_state.heap_size;
+    serial_debug_str("C2\n");
+    *heap_size_ptr = 0;
+    serial_debug_str("D\n");
     serial_debug_str("boundaries_set\n");
 
     // Expand initial heap
