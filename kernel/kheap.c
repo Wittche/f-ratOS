@@ -9,18 +9,6 @@
 #include "vmm.h"
 #include "console.h"
 #include "types.h"
-#include "io.h"
-
-// Serial debug helpers (COM1 = 0x3F8)
-static inline void serial_debug_char(char c) {
-    outb(0x3F8, c);
-}
-
-static inline void serial_debug_str(const char *s) {
-    while (*s) {
-        serial_debug_char(*s++);
-    }
-}
 
 // Block header structure
 typedef struct block_header {
@@ -161,31 +149,19 @@ void kheap_coalesce(void) {
  * Expand heap by allocating more pages
  */
 void kheap_expand(uint64_t size) {
-    serial_debug_str("expand_enter\n");
-
     // Align size to page boundary
     size = ALIGN_UP(size, PAGE_SIZE);
-    serial_debug_str("aligned\n");
 
     // Check max heap size
     if (heap_state.heap_size + size > HEAP_MAX_SIZE) {
-        serial_debug_str("max_size_reached\n");
         console_print("[HEAP] WARNING: Max heap size reached\n");
         return;
     }
-    serial_debug_str("size_ok\n");
 
     // Allocate physical pages
     uint64_t num_pages = size / PAGE_SIZE;
-    serial_debug_str("calc_pages\n");
 
-    serial_debug_str("loop_start\n");
     for (uint64_t i = 0; i < num_pages; i++) {
-        // Progress every 16 pages
-        if (i % 16 == 0) {
-            serial_debug_char('.');
-        }
-
         uint64_t phys = pmm_alloc_frame();
         if (phys == 0) {
             console_print("[HEAP] ERROR: Failed to allocate physical page\n");
@@ -209,15 +185,21 @@ void kheap_expand(uint64_t size) {
     new_block->prev = NULL;
 
     // Find last block and append
-    block_header_t *last = heap_state.first_block;
-    while (last && last->next) {
-        last = last->next;
-    }
-
-    if (last) {
+    if (!heap_state.first_block) {
+        // First block ever - initialize the list
+        heap_state.first_block = new_block;
+    } else {
+        // Find last block and append
+        block_header_t *last = heap_state.first_block;
+        while (last && last->next) {
+            last = last->next;
+        }
         last->next = new_block;
         new_block->prev = last;
     }
+
+    // Memory barrier to ensure all writes are visible
+    __asm__ volatile("mfence" ::: "memory");
 
     heap_state.heap_end += size;
     heap_state.heap_size += size;
@@ -410,35 +392,18 @@ void* krealloc(void *ptr, uint64_t new_size) {
  * Initialize kernel heap
  */
 void kheap_init(boot_info_t *boot_info) {
-    serial_debug_str("kheap_init_entered\n");
     console_print("[HEAP] Initializing kernel heap...\n");
-    serial_debug_str("after_console_print\n");
 
     // Set heap boundaries
-    serial_debug_str("setting_heap_boundaries\n");
+    heap_state.heap_start = HEAP_START_ADDR;
+    heap_state.heap_end = HEAP_START_ADDR;
+    heap_state.heap_size = 0;
 
-    // Try a volatile pointer to prevent optimization issues
-    serial_debug_str("A\n");
-    volatile uint64_t *heap_start_ptr = &heap_state.heap_start;
-    serial_debug_str("A2\n");
-    *heap_start_ptr = HEAP_START_ADDR;
-    serial_debug_str("B\n");
-
-    volatile uint64_t *heap_end_ptr = &heap_state.heap_end;
-    serial_debug_str("B2\n");
-    *heap_end_ptr = HEAP_START_ADDR;
-    serial_debug_str("C\n");
-
-    volatile uint64_t *heap_size_ptr = &heap_state.heap_size;
-    serial_debug_str("C2\n");
-    *heap_size_ptr = 0;
-    serial_debug_str("D\n");
-    serial_debug_str("boundaries_set\n");
+    // Memory barrier to ensure initialization is visible
+    __asm__ volatile("mfence" ::: "memory");
 
     // Expand initial heap
-    serial_debug_str("before_kheap_expand\n");
     kheap_expand(HEAP_INITIAL_SIZE);
-    serial_debug_str("after_kheap_expand\n");
 
     if (heap_state.heap_size == 0) {
         console_print("[HEAP] ERROR: Failed to initialize heap\n");
