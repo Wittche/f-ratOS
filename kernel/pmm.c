@@ -251,6 +251,22 @@ uint64_t pmm_alloc_frame(void) {
     // Start search from last allocated position (faster!)
     uint64_t start = pmm_state.last_allocated;
 
+    // Debug: print highest_page ONCE
+    static bool printed_once = false;
+    if (!printed_once) {
+        const char *msg = "[HP:";
+        while (*msg) outb(0x3F8, *msg++);
+
+        // Print in hex
+        uint64_t hp = pmm_state.highest_page;
+        for (int i = 60; i >= 0; i -= 4) {
+            char nibble = (hp >> i) & 0xF;
+            outb(0x3F8, nibble < 10 ? '0' + nibble : 'A' + nibble - 10);
+        }
+        outb(0x3F8, ']');
+        printed_once = true;
+    }
+
     // Search from last_allocated to end
     for (uint64_t page = start; page < pmm_state.highest_page; page++) {
         if (page % 1024 == 0) outb(0x3F8, 'S'); // Progress every 1024 pages
