@@ -172,7 +172,9 @@ void kheap_expand(uint64_t size) {
     for (uint64_t i = 0; i < num_pages; i++) {
         if (i % 64 == 0) outb(0x3F8, '.');
 
+        serial_write("[CALL_PMM]");
         uint64_t phys = pmm_alloc_frame();
+        serial_write("[BACK_PMM]");
         if (phys == 0) {
             serial_write("PMM_FAIL\n");
             console_print("[HEAP] ERROR: Failed to allocate physical page\n");
@@ -180,7 +182,10 @@ void kheap_expand(uint64_t size) {
         }
 
         uint64_t virt = heap_state.heap_end + (i * PAGE_SIZE);
-        if (!vmm_map_page(virt, phys, PTE_KERNEL_FLAGS)) {
+        serial_write("[CALL_VMM]");
+        bool result = vmm_map_page(virt, phys, PTE_KERNEL_FLAGS);
+        serial_write("[BACK_VMM]");
+        if (!result) {
             serial_write("VMM_MAP_FAIL\n");
             console_print("[HEAP] ERROR: Failed to map heap page\n");
             pmm_free_frame(phys);
