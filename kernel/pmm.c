@@ -264,6 +264,17 @@ uint64_t pmm_alloc_frame(void) {
             outb(0x3F8, nibble < 10 ? '0' + nibble : 'A' + nibble - 10);
         }
         outb(0x3F8, ']');
+
+        // Print page_bitmap address!
+        msg = "[BM:";
+        while (*msg) outb(0x3F8, *msg++);
+        uint64_t bitmap_addr = (uint64_t)page_bitmap;
+        for (int i = 60; i >= 0; i -= 4) {
+            char nibble = (bitmap_addr >> i) & 0xF;
+            outb(0x3F8, nibble < 10 ? '0' + nibble : 'A' + nibble - 10);
+        }
+        outb(0x3F8, ']');
+
         printed_once = true;
     }
 
@@ -271,7 +282,9 @@ uint64_t pmm_alloc_frame(void) {
     for (uint64_t page = start; page < pmm_state.highest_page; page++) {
         if (page % 1024 == 0) outb(0x3F8, 'S'); // Progress every 1024 pages
 
+        outb(0x3F8, 'T'); // About to test bitmap
         if (!bitmap_test(page)) {
+            outb(0x3F8, 'F'); // Test passed, found free
             // Found free page - mark as used
             page_bitmap[page / 8] |= (1 << (page % 8));
             pmm_state.free_pages--;
