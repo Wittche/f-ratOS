@@ -33,6 +33,7 @@ static struct {
     uint64_t free_pages;
     uint64_t used_pages;
     uint64_t highest_page;     // Highest usable page number
+    uint64_t last_allocated;   // Cache for faster allocation
     bool initialized;
 } pmm_state = {0};
 
@@ -245,17 +246,28 @@ uint64_t pmm_alloc_frame(void) {
         return 0;
     }
 
-    // Find first free page (first-fit)
-    for (uint64_t page = 0; page < pmm_state.highest_page; page++) {
-        // Progress indicator every 512 pages
-        if (page % 512 == 0) outb(0x3F8, 'P');
+    // Start search from last allocated position (faster!)
+    uint64_t start = pmm_state.last_allocated;
 
+    // Search from last_allocated to end
+    for (uint64_t page = start; page < pmm_state.highest_page; page++) {
         if (!bitmap_test(page)) {
             // Found free page - mark as used
             page_bitmap[page / 8] |= (1 << (page % 8));
             pmm_state.free_pages--;
             pmm_state.used_pages++;
-            outb(0x3F8, 'F'); // Found
+            pmm_state.last_allocated = page + 1; // Next search starts after this
+            return PAGE_TO_ADDR(page);
+        }
+    }
+
+    // Wrap around: search from 0 to start
+    for (uint64_t page = 0; page < start; page++) {
+        if (!bitmap_test(page)) {
+            page_bitmap[page / 8] |= (1 << (page % 8));
+            pmm_state.free_pages--;
+            pmm_state.used_pages++;
+            pmm_state.last_allocated = page + 1;
             return PAGE_TO_ADDR(page);
         }
     }
