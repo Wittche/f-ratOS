@@ -260,10 +260,14 @@ uint64_t pmm_alloc_frame(void) {
 
         if (!bitmap_test(page)) {
             serial_debug_char('F');  // Found
+            serial_debug_char('1');  // Before bitmap mark
             // Found free page - mark as used
             page_bitmap[page / 8] |= (1 << (page % 8));
+            serial_debug_char('2');  // After bitmap mark
             pmm_state.free_pages--;
+            serial_debug_char('3');  // After free_pages--
             pmm_state.used_pages++;
+            serial_debug_char('4');  // After used_pages++
             serial_debug_char('R');  // Returning
             return PAGE_TO_ADDR(page);
         }
