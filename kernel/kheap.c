@@ -181,6 +181,11 @@ void kheap_expand(uint64_t size) {
 
     serial_debug_str("loop_start\n");
     for (uint64_t i = 0; i < num_pages; i++) {
+        // Progress every 16 pages
+        if (i % 16 == 0) {
+            serial_debug_char('.');
+        }
+
         uint64_t phys = pmm_alloc_frame();
         if (phys == 0) {
             console_print("[HEAP] ERROR: Failed to allocate physical page\n");
