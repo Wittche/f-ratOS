@@ -247,11 +247,15 @@ uint64_t pmm_alloc_frame(void) {
 
     // Find first free page (first-fit)
     for (uint64_t page = 0; page < pmm_state.highest_page; page++) {
+        // Progress indicator every 512 pages
+        if (page % 512 == 0) outb(0x3F8, 'P');
+
         if (!bitmap_test(page)) {
             // Found free page - mark as used
             page_bitmap[page / 8] |= (1 << (page % 8));
             pmm_state.free_pages--;
             pmm_state.used_pages++;
+            outb(0x3F8, 'F'); // Found
             return PAGE_TO_ADDR(page);
         }
     }
