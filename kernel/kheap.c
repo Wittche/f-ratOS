@@ -418,8 +418,11 @@ void kheap_init(boot_info_t *boot_info) {
     serial_write("after_console_print_1\n");
 
     // Set heap boundaries
+    serial_write("A\n");
     heap_state.heap_start = HEAP_START_ADDR;
+    serial_write("B\n");
     heap_state.heap_end = HEAP_START_ADDR;
+    serial_write("C\n");
     heap_state.heap_size = 0;
     serial_write("heap_bounds_set\n");
 
