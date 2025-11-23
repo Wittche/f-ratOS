@@ -21,8 +21,8 @@ static inline void serial_debug_str(const char *s) {
 
 // Bitmap to track page allocation (1 = allocated, 0 = free)
 // Each bit represents one 4KB page
-// 1MB bitmap = supports up to 32GB RAM (1MB * 8 bits * 4KB)
-#define BITMAP_SIZE (1024 * 1024)  // 1MB
+// Reduced from 1MB to 16KB for low-RAM systems (avoids BSS mapping issues)
+#define BITMAP_SIZE (16 * 1024)  // 16KB (supports up to 512MB RAM)
 // Initialize all pages as allocated (0xFF) at compile time to avoid runtime loop
 // Using GCC designated initializer extension
 static uint8_t page_bitmap[BITMAP_SIZE] = {[0 ... (BITMAP_SIZE-1)] = 0xFF};
