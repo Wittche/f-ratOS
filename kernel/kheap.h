@@ -13,7 +13,7 @@
 
 // Heap configuration
 #define HEAP_START_ADDR   0x200000      // 2MB (after kernel)
-#define HEAP_INITIAL_SIZE (64 * 1024)   // 64KB initial heap (works with low RAM)
+#define HEAP_INITIAL_SIZE (16 * 1024)   // 16KB initial heap (faster boot on low RAM)
 #define HEAP_MAX_SIZE     (16 * 1024 * 1024) // 16MB max heap
 #define HEAP_MIN_BLOCK    16             // Minimum block size
 

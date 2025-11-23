@@ -280,38 +280,26 @@ uint64_t pmm_alloc_frame(void) {
 
     // Search from last_allocated to end
     for (uint64_t page = start; page < pmm_state.highest_page; page++) {
-        if (page % 1024 == 0) outb(0x3F8, 'S'); // Progress every 1024 pages
-
-        outb(0x3F8, 'T'); // About to test bitmap
         if (!bitmap_test(page)) {
-            outb(0x3F8, 'F'); // Test passed, found free
             // Found free page - mark as used
             page_bitmap[page / 8] |= (1 << (page % 8));
             pmm_state.free_pages--;
             pmm_state.used_pages++;
             pmm_state.last_allocated = page + 1; // Next search starts after this
-            outb(0x3F8, '>'); // Found and returning
             return PAGE_TO_ADDR(page);
         }
     }
 
-    outb(0x3F8, 'W'); // Wrap around
-
     // Wrap around: search from 0 to start
     for (uint64_t page = 0; page < start; page++) {
-        if (page % 1024 == 0) outb(0x3F8, 'W');
-
         if (!bitmap_test(page)) {
             page_bitmap[page / 8] |= (1 << (page % 8));
             pmm_state.free_pages--;
             pmm_state.used_pages++;
             pmm_state.last_allocated = page + 1;
-            outb(0x3F8, '>'); // Found
             return PAGE_TO_ADDR(page);
         }
     }
-
-    outb(0x3F8, '!'); // Failed!
     console_print("[DEBUG] PMM: No free pages found!\n");
     return 0;
 }
