@@ -213,8 +213,6 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
                 return NULL;  // Can't split without create permission
             }
 
-            serial_debug_str("[VMM] Splitting 2MB huge page\n");
-
             // Get the base physical address of the huge page
             uint64_t huge_phys_base = pte_get_addr(*pd_entry);
             uint64_t huge_flags = *pd_entry & PTE_FLAGS_MASK;
@@ -241,8 +239,6 @@ pte_t* vmm_get_pte(uint64_t virt_addr, bool create) {
 
             // Flush TLB to ensure CPU sees the new page table structure
             vmm_flush_tlb();
-
-            serial_debug_str("[VMM] Split complete\n");
         } else {
             pt = (page_table_t*)pte_get_addr(*pd_entry);
         }

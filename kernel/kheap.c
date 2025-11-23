@@ -179,29 +179,19 @@ void kheap_expand(uint64_t size) {
     uint64_t num_pages = size / PAGE_SIZE;
     serial_debug_str("calc_pages\n");
 
-    serial_debug_str("loop_start\n");
     for (uint64_t i = 0; i < num_pages; i++) {
-        // Progress indicator every 64 pages
-        if (i % 64 == 0) {
-            serial_debug_char('.');
-        }
-
-        serial_debug_char('P');  // Before PMM
         uint64_t phys = pmm_alloc_frame();
-        serial_debug_char('p');  // After PMM
         if (phys == 0) {
             console_print("[HEAP] ERROR: Failed to allocate physical page\n");
             return;
         }
 
         uint64_t virt = heap_state.heap_end + (i * PAGE_SIZE);
-        serial_debug_char('V');  // Before VMM
         if (!vmm_map_page(virt, phys, PTE_KERNEL_FLAGS)) {
             console_print("[HEAP] ERROR: Failed to map heap page\n");
             pmm_free_frame(phys);
             return;
         }
-        serial_debug_char('v');  // After VMM
     }
 
     // Create new free block at end of heap
