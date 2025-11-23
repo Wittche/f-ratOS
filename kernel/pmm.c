@@ -100,6 +100,20 @@ void pmm_init(boot_info_t *boot_info) {
         }
         serial_debug_str("after_mark_free\n");
 
+        // IMPORTANT: Reserve kernel memory (1MB-2MB) - kernel lives here!
+        serial_debug_str("reserving_kernel\n");
+        uint64_t kernel_start_page = ADDR_TO_PAGE(0x100000);  // 1MB
+        uint64_t kernel_end_page = ADDR_TO_PAGE(0x200000);    // 2MB
+        for (uint64_t page = kernel_start_page; page < kernel_end_page; page++) {
+            if (!bitmap_test(page)) {
+                bitmap_set(page);
+                if (pmm_state.free_pages > 0) {
+                    pmm_state.free_pages--;
+                }
+            }
+        }
+        serial_debug_str("kernel_reserved\n");
+
         serial_debug_str("calc_used_pages\n");
         pmm_state.used_pages = pmm_state.total_pages - pmm_state.free_pages;
         pmm_state.initialized = true;
@@ -221,23 +235,36 @@ void pmm_init(boot_info_t *boot_info) {
  * Allocate a single physical page frame
  */
 uint64_t pmm_alloc_frame(void) {
+    serial_debug_char('E');  // Entered function
+
     if (!pmm_state.initialized) {
         console_print("[DEBUG] PMM not initialized!\n");
         return 0;
     }
+
+    serial_debug_char('I');  // Init check passed
 
     if (pmm_state.free_pages == 0) {
         console_print("[DEBUG] PMM: Out of memory!\n");
         return 0;  // Out of memory
     }
 
+    serial_debug_char('S');  // Starting search
+
     // Find first free page (first-fit)
     for (uint64_t page = 0; page < pmm_state.highest_page; page++) {
+        // Progress every 1024 pages
+        if (page % 1024 == 0) {
+            serial_debug_char('.');
+        }
+
         if (!bitmap_test(page)) {
+            serial_debug_char('F');  // Found free page
             // Found free page - mark as used
             page_bitmap[page / 8] |= (1 << (page % 8));
             pmm_state.free_pages--;
             pmm_state.used_pages++;
+            serial_debug_char('R');  // Returning
             return PAGE_TO_ADDR(page);
         }
     }
